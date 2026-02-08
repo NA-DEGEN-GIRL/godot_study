@@ -1,0 +1,259 @@
+/* Godot Study - Custom Theme */
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+:root {
+  --gd-blue: #478CBF;
+  --gd-dark: #1a1a2e;
+  --gd-light: #e8f4f8;
+  --gd-accent: #e0e0e0;
+  --gd-green: #4ec9b0;
+  --gd-red: #f44747;
+  --gd-orange: #ce9178;
+  --gd-navy: #263246;
+}
+
+.reveal {
+  font-family: 'Noto Sans KR', sans-serif;
+}
+
+/* 슬라이드 내용 오버플로우 시 스크롤 허용 */
+.reveal .slides {
+  overflow: visible !important;
+}
+
+.reveal .slides > section,
+.reveal .slides > section > section {
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  height: 100% !important;
+  max-height: 700px !important;
+  padding-right: 30px !important;
+  padding-bottom: 40px !important;
+  box-sizing: border-box;
+}
+
+.reveal .slide-content {
+  height: auto !important;
+}
+
+/* 스크롤바 스타일링 */
+.reveal .slides > section::-webkit-scrollbar,
+.reveal .slides > section > section::-webkit-scrollbar {
+  width: 8px;
+  margin-left: 10px;
+}
+.reveal .slides > section::-webkit-scrollbar-track,
+.reveal .slides > section > section::-webkit-scrollbar-track {
+  background: transparent;
+}
+.reveal .slides > section::-webkit-scrollbar-thumb,
+.reveal .slides > section > section::-webkit-scrollbar-thumb {
+  background: rgba(71, 140, 191, 0.4);
+  border-radius: 3px;
+}
+.reveal .slides > section::-webkit-scrollbar-thumb:hover,
+.reveal .slides > section > section::-webkit-scrollbar-thumb:hover {
+  background: rgba(71, 140, 191, 0.7);
+}
+
+.reveal h1, .reveal h2, .reveal h3 {
+  font-weight: 700;
+  color: var(--gd-blue);
+  text-transform: none;
+}
+
+.reveal h1 { font-size: 2.2em; }
+.reveal h2 { font-size: 1.6em; }
+.reveal h3 { font-size: 1.3em; }
+
+.reveal code, .reveal pre code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85em;
+}
+
+.reveal pre {
+  width: auto;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+  border-radius: 8px;
+}
+
+.reveal pre code {
+  padding: 20px !important;
+  line-height: 1.5;
+  max-height: 500px;
+}
+
+/* Chapter title slide */
+.chapter-title {
+  text-align: center;
+}
+.chapter-title h1 {
+  font-size: 2.8em;
+  margin-bottom: 0.3em;
+}
+.chapter-title .subtitle {
+  font-size: 1.2em;
+  color: #888;
+}
+.chapter-title .chapter-number {
+  display: inline-block;
+  background: var(--gd-blue);
+  color: white;
+  padding: 10px 30px;
+  border-radius: 30px;
+  font-size: 1.1em;
+  margin-bottom: 20px;
+}
+
+/* Key point box */
+.key-point {
+  background: linear-gradient(135deg, #1e3a5f, #2d5a87);
+  color: white;
+  padding: 20px 30px;
+  border-radius: 10px;
+  border-left: 5px solid var(--gd-accent);
+  margin: 20px 0;
+  text-align: left;
+}
+.key-point h3 {
+  color: var(--gd-accent) !important;
+  margin-top: 0;
+}
+
+/* Comparison table */
+.compare-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  font-size: 0.8em;
+}
+.compare-table th {
+  background: var(--gd-blue);
+  color: white;
+  padding: 12px 16px;
+}
+.compare-table td {
+  padding: 10px 16px;
+  border-bottom: 1px solid #ddd;
+}
+.compare-table tr:nth-child(even) td {
+  background: rgba(71, 140, 191, 0.05);
+}
+
+/* Two column layout */
+.two-columns {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  width: 100%;
+  box-sizing: border-box;
+}
+.two-columns > div {
+  flex: 1;
+  min-width: 0;
+  overflow-x: hidden;
+}
+.two-columns pre {
+  width: auto !important;
+  overflow-x: auto;
+}
+.two-columns > div > code,
+.two-columns p code,
+.two-columns li code {
+  word-break: break-all;
+}
+
+/* Badge / tag */
+.badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 15px;
+  font-size: 0.75em;
+  font-weight: 500;
+  margin: 2px;
+}
+.badge-blue { background: var(--gd-blue); color: white; }
+.badge-green { background: var(--gd-green); color: #1a1a2e; }
+.badge-red { background: var(--gd-red); color: white; }
+.badge-orange { background: var(--gd-orange); color: #1a1a2e; }
+
+/* Tips */
+.tip {
+  background: rgba(78, 201, 176, 0.1);
+  border-left: 4px solid var(--gd-green);
+  padding: 15px 20px;
+  border-radius: 0 8px 8px 0;
+  margin: 15px 0;
+  text-align: left;
+  font-size: 0.85em;
+}
+
+/* Warning */
+.warning {
+  background: rgba(244, 71, 71, 0.1);
+  border-left: 4px solid var(--gd-red);
+  padding: 15px 20px;
+  border-radius: 0 8px 8px 0;
+  margin: 15px 0;
+  text-align: left;
+  font-size: 0.85em;
+}
+
+/* Navigation footer */
+.nav-footer {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.6em;
+  color: #888;
+}
+
+/* Slide number styling */
+.reveal .slide-number {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  background: var(--gd-blue);
+  color: white;
+  padding: 5px 10px;
+  border-radius: 5px 0 0 0;
+}
+
+/* Fragment highlight */
+.reveal .fragment.highlight-gd {
+  opacity: 1;
+  visibility: inherit;
+}
+.reveal .fragment.highlight-gd.visible {
+  color: var(--gd-blue);
+  font-weight: 700;
+}
+
+/* List styling */
+.reveal ul, .reveal ol {
+  text-align: left;
+}
+.reveal li {
+  margin-bottom: 0.5em;
+  line-height: 1.5;
+}
+
+/* Emoji icon */
+.icon {
+  font-size: 1.5em;
+  vertical-align: middle;
+  margin-right: 8px;
+}
+
+/* Progress indicator */
+.progress-bar {
+  height: 4px;
+  background: var(--gd-blue);
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 100;
+  transition: width 0.3s;
+}

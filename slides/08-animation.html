@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 8: 애니메이션 - Godot 초보부터 고수까지</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/theme/night.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/plugin/highlight/monokai.min.css">
+  <link rel="stylesheet" href="css/custom.css">
+  <link rel="stylesheet" href="css/narration.css">
+</head>
+<body>
+  <div class="reveal">
+    <div class="slides">
+
+      <!-- Slide 1: Title -->
+      <section class="chapter-title" data-transition="zoom" data-narration="챕터 8에서는 Godot의 애니메이션 시스템을 학습합니다. AnimationPlayer로 속성 키프레임 애니메이션을 만들고, AnimatedSprite2D로 스프라이트 시트를 재생하며, Tween으로 코드 기반의 간편한 보간 애니메이션을 구현합니다. 마지막으로 AnimationTree를 활용한 상태 머신까지, 게임에 생동감을 불어넣는 모든 기법을 다룹니다.">
+        <span class="chapter-number">Chapter 08</span>
+        <h1>애니메이션</h1>
+        <p class="subtitle">AnimationPlayer, AnimatedSprite2D, Tween, AnimationTree</p>
+        <br>
+        <p><a href="../index.html" style="color: #888; font-size: 0.6em;">&#8592; 목차로 돌아가기</a></p>
+      </section>
+
+      <!-- Slide 2: AnimationPlayer 개요 -->
+      <section data-narration="AnimationPlayer는 Godot의 핵심 애니메이션 도구입니다. 어떤 노드의 어떤 속성이든 시간에 따라 변화시킬 수 있습니다. 위치, 회전, 크기뿐 아니라 색상, 투명도, 텍스트, 심지어 함수 호출까지 키프레임으로 기록할 수 있습니다. 에디터 하단의 애니메이션 패널에서 시각적으로 편집하며 실시간 미리보기가 가능합니다.">
+        <h2>AnimationPlayer 개요</h2>
+        <div class="key-point">
+          <h3>AnimationPlayer = 범용 애니메이션 엔진</h3>
+          <p>씬 트리 내 모든 노드의 모든 속성을 시간 축에 따라 키프레임으로 제어할 수 있는 강력한 애니메이션 도구입니다. 하나의 AnimationPlayer로 여러 노드를 동시에 애니메이션합니다.</p>
+        </div>
+        <div class="two-columns">
+          <div>
+            <h3>주요 특징</h3>
+            <ul>
+              <li class="fragment">모든 노드의 모든 속성을 애니메이션 가능</li>
+              <li class="fragment">여러 트랙을 동시에 재생</li>
+              <li class="fragment">트랙 종류: 속성, 메서드, 오디오, Bezier</li>
+              <li class="fragment">에디터에서 시각적으로 편집</li>
+              <li class="fragment">코드에서 재생/정지/큐잉 제어</li>
+            </ul>
+          </div>
+          <div>
+            <pre><code class="language-gdscript"># AnimationPlayer 기본 사용
+@onready var anim = $AnimationPlayer
+
+func _ready():
+    # 애니메이션 재생
+    anim.play("idle")
+
+    # 시그널 연결
+    anim.animation_finished.connect(
+        _on_animation_finished
+    )
+
+func _on_animation_finished(name):
+    print(name, " 완료!")
+    if name == "attack":
+        anim.play("idle")</code></pre>
+          </div>
+        </div>
+        <div class="tip">
+          <strong>Tip:</strong> 에디터 하단의 Animation 패널에서 새 애니메이션을 만들고, 인스펙터에서 속성 옆의 열쇠 아이콘을 클릭하면 현재 값이 키프레임으로 기록됩니다.
+        </div>
+      </section>
+
+      <!-- Slide 3: 키프레임 애니메이션 -->
+      <section data-narration="키프레임 애니메이션은 특정 시간에 속성 값을 기록하고 그 사이를 보간하여 부드러운 변화를 만드는 기법입니다. 에디터에서는 타임라인에 키프레임을 찍고, 코드에서는 Animation 리소스를 직접 생성하여 트랙을 추가할 수 있습니다. 보간 모드를 설정하면 선형, 큐빅, 스텝 등 다양한 전환 효과를 만들 수 있습니다.">
+        <h2>키프레임 애니메이션</h2>
+        <pre><code class="language-gdscript"># 코드로 Animation 리소스 생성
+func create_bounce_animation() -> Animation:
+    var anim = Animation.new()
+    anim.length = 1.0
+    anim.loop_mode = Animation.LOOP_LINEAR
+
+    # 위치 Y 트랙 추가
+    var track_idx = anim.add_track(Animation.TYPE_VALUE)
+    anim.track_set_path(track_idx, "Sprite2D:position:y")
+
+    # 키프레임 삽입
+    anim.track_insert_key(track_idx, 0.0, 0.0)     # 시작: y=0
+    anim.track_insert_key(track_idx, 0.5, -30.0)    # 중간: y=-30 (위로)
+    anim.track_insert_key(track_idx, 1.0, 0.0)      # 끝: y=0
+
+    # 보간 모드 설정
+    anim.track_set_interpolation_type(
+        track_idx, Animation.INTERPOLATION_CUBIC
+    )
+
+    return anim
+
+func _ready():
+    var anim_player = $AnimationPlayer
+    var bounce = create_bounce_animation()
+
+    # 애니메이션 라이브러리에 추가
+    var lib = anim_player.get_animation_library("")
+    lib.add_animation("bounce", bounce)
+    anim_player.play("bounce")</code></pre>
+        <table class="compare-table fragment">
+          <tr><th>보간 타입</th><th>설명</th><th>사용 예</th></tr>
+          <tr><td><code>INTERPOLATION_NEAREST</code></td><td>즉시 전환 (스텝)</td><td>스프라이트 전환, ON/OFF</td></tr>
+          <tr><td><code>INTERPOLATION_LINEAR</code></td><td>선형 보간</td><td>일정한 속도 이동</td></tr>
+          <tr><td><code>INTERPOLATION_CUBIC</code></td><td>큐빅 보간 (부드럽게)</td><td>자연스러운 움직임</td></tr>
+        </table>
+      </section>
+
+      <!-- Slide 4: 속성 트랙 / 메서드 트랙 -->
+      <section data-narration="AnimationPlayer는 여러 종류의 트랙을 지원합니다. 속성 트랙은 노드의 속성 값을 시간에 따라 변화시키고, 메서드 트랙은 특정 시간에 함수를 호출합니다. 오디오 트랙은 애니메이션 중 사운드를 재생하고, Bezier 트랙은 곡선 편집기로 정밀한 이징 제어가 가능합니다. 이 트랙들을 조합하면 복합적인 연출을 만들 수 있습니다.">
+        <h2>트랙 종류</h2>
+        <div class="two-columns">
+          <div>
+            <h3>주요 트랙 타입</h3>
+            <table class="compare-table">
+              <tr><th>트랙</th><th>기능</th></tr>
+              <tr><td><span class="badge badge-blue">Value</span></td><td>속성 값 보간</td></tr>
+              <tr><td><span class="badge badge-green">Method</span></td><td>함수 호출</td></tr>
+              <tr><td><span class="badge badge-orange">Audio</span></td><td>사운드 재생</td></tr>
+              <tr><td><span class="badge badge-red">Bezier</span></td><td>곡선 기반 보간</td></tr>
+              <tr><td><span class="badge badge-blue">Animation</span></td><td>다른 애니메이션 재생</td></tr>
+            </table>
+          </div>
+          <div>
+            <pre><code class="language-gdscript"># 메서드 트랙 활용 예
+# 에디터에서 Method 트랙 추가 후
+# 특정 시간에 함수 호출 설정
+
+# 공격 애니메이션에서:
+# 0.0초 - 칼 올리기 시작
+# 0.3초 - spawn_slash_effect() 호출
+# 0.5초 - apply_damage() 호출
+# 0.8초 - play_hit_sound() 호출
+# 1.0초 - idle 복귀
+
+func spawn_slash_effect():
+    var fx = slash_scene.instantiate()
+    add_child(fx)
+
+func apply_damage():
+    var area = $HitBox
+    for body in area.get_overlapping_bodies():
+        if body.has_method("take_damage"):
+            body.take_damage(attack_power)
+
+func play_hit_sound():
+    $AudioStreamPlayer.play()</code></pre>
+          </div>
+        </div>
+        <div class="warning">
+          <strong>주의:</strong> 메서드 트랙에서 호출되는 함수는 해당 AnimationPlayer가 부착된 노드의 스크립트에 정의되어야 합니다. 다른 노드의 메서드를 직접 호출할 수 없으므로 래퍼 함수를 만들어 사용하세요.
+        </div>
+      </section>
+
+      <!-- Slide 5: AnimatedSprite2D -->
+      <section data-narration="AnimatedSprite2D는 여러 프레임 이미지를 순서대로 재생하여 스프라이트 애니메이션을 만드는 노드입니다. SpriteFrames 리소스에 이미지들을 등록하고 애니메이션 이름별로 그룹화합니다. idle, walk, attack 등 상태별 프레임 시퀀스를 만들고 코드에서 play 함수로 재생합니다. 프레임 기반이라 도트 게임이나 2D 캐릭터에 적합합니다.">
+        <h2>AnimatedSprite2D</h2>
+        <div class="two-columns">
+          <div>
+            <h3>설정 방법</h3>
+            <ol>
+              <li class="fragment">AnimatedSprite2D 노드 추가</li>
+              <li class="fragment">인스펙터에서 SpriteFrames 새로 생성</li>
+              <li class="fragment">SpriteFrames 에디터에서 애니메이션 추가</li>
+              <li class="fragment">각 애니메이션에 프레임 이미지 드래그</li>
+              <li class="fragment">FPS, 루프 설정 조정</li>
+            </ol>
+            <br>
+            <div class="tip">
+              <strong>Tip:</strong> 스프라이트 시트를 사용하면 하나의 이미지에서 여러 프레임을 자동으로 잘라낼 수 있습니다. SpriteFrames 에디터에서 격자 아이콘을 클릭하세요.
+            </div>
+          </div>
+          <div>
+            <pre><code class="language-gdscript"># AnimatedSprite2D 제어
+@onready var sprite = $AnimatedSprite2D
+
+func _ready():
+    sprite.play("idle")
+
+    # 애니메이션 끝 감지
+    sprite.animation_finished.connect(
+        _on_anim_finished
+    )
+
+func walk(direction: Vector2):
+    sprite.play("walk")
+    # 방향에 따라 좌우 반전
+    sprite.flip_h = direction.x < 0
+
+func attack():
+    sprite.play("attack")
+
+func _on_anim_finished():
+    # 일회성 애니메이션 후 idle 복귀
+    if sprite.animation == "attack":
+        sprite.play("idle")
+    elif sprite.animation == "hurt":
+        sprite.play("idle")
+
+# 현재 프레임 확인
+func _process(_delta):
+    if sprite.animation == "attack":
+        if sprite.frame == 3:
+            # 3번 프레임에서 히트 판정
+            check_hit()</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 6: SpriteFrames 리소스 -->
+      <section data-narration="SpriteFrames는 AnimatedSprite2D가 사용하는 프레임 데이터 리소스입니다. 하나의 SpriteFrames 안에 여러 애니메이션을 정의할 수 있고, 각 애니메이션마다 프레임 이미지, 재생 속도, 루프 여부를 설정합니다. 코드로 SpriteFrames를 동적으로 생성하거나 수정하여 런타임에 애니메이션을 추가하는 것도 가능합니다.">
+        <h2>SpriteFrames 리소스</h2>
+        <pre><code class="language-gdscript"># 코드로 SpriteFrames 생성
+func create_sprite_frames() -> SpriteFrames:
+    var frames = SpriteFrames.new()
+
+    # 기본 "default" 애니메이션 제거
+    frames.remove_animation("default")
+
+    # idle 애니메이션 (4프레임, 루프)
+    frames.add_animation("idle")
+    frames.set_animation_speed("idle", 8.0)  # 8 FPS
+    frames.set_animation_loop("idle", true)
+    for i in range(4):
+        var tex = load("res://sprites/player/idle_%d.png" % i)
+        frames.add_frame("idle", tex)
+
+    # walk 애니메이션 (6프레임, 루프)
+    frames.add_animation("walk")
+    frames.set_animation_speed("walk", 12.0)  # 12 FPS
+    frames.set_animation_loop("walk", true)
+    for i in range(6):
+        var tex = load("res://sprites/player/walk_%d.png" % i)
+        frames.add_frame("walk", tex)
+
+    # attack 애니메이션 (5프레임, 루프 안함)
+    frames.add_animation("attack")
+    frames.set_animation_speed("attack", 15.0)
+    frames.set_animation_loop("attack", false)
+    for i in range(5):
+        var tex = load("res://sprites/player/attack_%d.png" % i)
+        frames.add_frame("attack", tex)
+
+    return frames</code></pre>
+        <div class="key-point fragment">
+          <h3>AnimatedSprite2D vs AnimationPlayer + Sprite2D</h3>
+          <p><span class="badge badge-green">AnimatedSprite2D</span> - 프레임 교체만 필요할 때 간편. <span class="badge badge-blue">AnimationPlayer</span> - 위치, 크기, 색상 등 여러 속성을 동시에 애니메이션할 때 적합. 복잡한 캐릭터 애니메이션은 AnimationPlayer가 유리합니다.</p>
+        </div>
+      </section>
+
+      <!-- Slide 7: 애니메이션 재생 제어 -->
+      <section data-narration="AnimationPlayer의 재생 제어 함수들을 알아봅니다. play로 재생, stop으로 정지, pause로 일시정지합니다. queue를 사용하면 현재 재생이 끝난 후 자동으로 다음 애니메이션을 재생합니다. speed_scale로 재생 속도를 조절하고, play를 음수 속도로 호출하면 역재생도 가능합니다. seek로 특정 시간으로 점프할 수 있습니다.">
+        <h2>애니메이션 재생 제어</h2>
+        <pre><code class="language-gdscript"># AnimationPlayer 재생 제어 함수들
+@onready var anim = $AnimationPlayer
+
+func _ready():
+    anim.play("idle")
+
+# 기본 재생 제어
+func play_animation(name: String):
+    anim.play(name)              # 즉시 재생
+    # anim.play(name, -1, 2.0)   # 2배속 재생
+    # anim.play(name, -1, -1.0)  # 역재생
+
+func stop_animation():
+    anim.stop()                  # 정지 (처음으로)
+
+func pause_animation():
+    anim.pause()                 # 일시정지 (현재 위치 유지)
+
+func resume_animation():
+    anim.play()                  # 마지막 위치에서 재개
+
+# 큐잉: 현재 애니메이션 끝나면 자동 재생
+func attack_combo():
+    anim.play("attack_1")
+    anim.queue("attack_2")      # attack_1 끝나면 attack_2
+    anim.queue("idle")           # attack_2 끝나면 idle
+
+# 특정 시간으로 이동
+func seek_to(time: float):
+    anim.seek(time, true)        # true = 즉시 업데이트
+
+# 재생 속도 조절
+func set_speed(scale: float):
+    anim.speed_scale = scale     # 0.5 = 반속, 2.0 = 2배속</code></pre>
+        <table class="compare-table fragment">
+          <tr><th>함수</th><th>동작</th><th>활용 예</th></tr>
+          <tr><td><code>play(name)</code></td><td>즉시 재생 (현재 중단)</td><td>상태 전환</td></tr>
+          <tr><td><code>queue(name)</code></td><td>현재 끝난 후 재생</td><td>연속 콤보</td></tr>
+          <tr><td><code>stop()</code></td><td>정지, 처음으로 초기화</td><td>애니메이션 리셋</td></tr>
+          <tr><td><code>pause() / play()</code></td><td>일시정지 / 재개</td><td>컷씬 제어</td></tr>
+          <tr><td><code>seek(time)</code></td><td>특정 시간으로 점프</td><td>미리보기, 스킵</td></tr>
+        </table>
+      </section>
+
+      <!-- Slide 8: Tween 클래스 -->
+      <section data-narration="Tween은 코드에서 간단한 보간 애니메이션을 빠르게 만드는 도구입니다. AnimationPlayer처럼 에디터에서 편집하는 것이 아니라 순수하게 코드로만 동작합니다. 한두 줄의 코드로 노드 속성을 부드럽게 변화시킬 수 있어, UI 효과나 임시적인 애니메이션에 매우 편리합니다. Godot 4에서는 create_tween 함수로 생성하며 자동으로 관리됩니다.">
+        <h2>Tween 클래스</h2>
+        <div class="key-point">
+          <h3>Tween = 코드 기반 간편 애니메이션</h3>
+          <p>에디터 없이 코드 몇 줄로 속성 보간 애니메이션을 만들 수 있습니다. UI 전환, 이펙트, 임시 연출에 매우 유용합니다. Godot 4에서 완전히 새롭게 설계되었습니다.</p>
+        </div>
+        <div class="two-columns">
+          <div>
+            <h3>Tween vs AnimationPlayer</h3>
+            <table class="compare-table">
+              <tr><th></th><th>Tween</th><th>AnimationPlayer</th></tr>
+              <tr><td>편집</td><td>코드 전용</td><td>에디터 + 코드</td></tr>
+              <tr><td>복잡도</td><td>간단한 보간</td><td>복합 타임라인</td></tr>
+              <tr><td>동적</td><td>런타임 생성</td><td>사전 정의</td></tr>
+              <tr><td>적합</td><td>UI, 이펙트</td><td>캐릭터, 컷씬</td></tr>
+            </table>
+          </div>
+          <div>
+            <pre><code class="language-gdscript"># Tween 기본 사용법
+func fade_in():
+    var tween = create_tween()
+    tween.tween_property(
+        self, "modulate:a",
+        1.0, 0.5  # 목표값, 시간
+    )
+
+func move_to(target: Vector2):
+    var tween = create_tween()
+    tween.tween_property(
+        self, "position",
+        target, 1.0
+    )
+
+# Tween 완료 콜백
+func flash_and_hide():
+    var tween = create_tween()
+    tween.tween_property(
+        self, "modulate",
+        Color.RED, 0.1
+    )
+    tween.tween_property(
+        self, "modulate",
+        Color.WHITE, 0.1
+    )
+    tween.tween_callback(hide)</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 9: create_tween()과 주요 메서드 -->
+      <section data-narration="create_tween은 노드에 바인딩된 Tween 객체를 생성합니다. tween_property는 속성을 목표 값까지 보간하고, tween_callback은 특정 시점에 함수를 호출합니다. tween_method는 커스텀 함수에 보간된 값을 전달하며, tween_interval은 지정 시간만큼 대기합니다. 이 네 가지 메서드를 조합하면 다양한 시퀀스를 만들 수 있습니다.">
+        <h2>Tween 핵심 메서드</h2>
+        <pre><code class="language-gdscript"># 1. tween_property: 속성 보간
+func example_property():
+    var tw = create_tween()
+    # (대상, 속성 경로, 목표값, 시간)
+    tw.tween_property(self, "position", Vector2(500, 300), 1.5)
+    tw.tween_property(self, "rotation", TAU, 1.0)  # 360도 회전
+    tw.tween_property($Sprite2D, "modulate:a", 0.0, 0.5)
+
+# 2. tween_callback: 함수 호출
+func example_callback():
+    var tw = create_tween()
+    tw.tween_property(self, "position:y", -100, 0.5)
+    tw.tween_callback(func(): print("최고점 도달!"))
+    tw.tween_property(self, "position:y", 0, 0.5)
+    tw.tween_callback(queue_free)  # 끝나면 삭제
+
+# 3. tween_method: 커스텀 함수에 보간값 전달
+func example_method():
+    var tw = create_tween()
+    # (함수, 시작값, 끝값, 시간)
+    tw.tween_method(set_hp_display, 100.0, 0.0, 2.0)
+
+func set_hp_display(value: float):
+    $HPLabel.text = "HP: %d" % int(value)
+    $HPBar.value = value
+
+# 4. tween_interval: 대기
+func example_interval():
+    var tw = create_tween()
+    tw.tween_property(self, "modulate", Color.RED, 0.1)
+    tw.tween_interval(0.5)  # 0.5초 대기
+    tw.tween_property(self, "modulate", Color.WHITE, 0.1)</code></pre>
+      </section>
+
+      <!-- Slide 10: 체이닝과 병렬 -->
+      <section data-narration="Tween의 기본 동작은 순차 실행입니다. 메서드를 연속으로 호출하면 이전 것이 끝난 후 다음이 시작됩니다. set_parallel을 호출하면 이후의 모든 트위너가 동시에 실행됩니다. 또는 개별 트위너에 as_relative, from_current, from 같은 수정자를 체이닝하여 세밀한 제어가 가능합니다. set_loops로 반복도 설정할 수 있습니다.">
+        <h2>체이닝과 병렬 실행</h2>
+        <div class="two-columns">
+          <div>
+            <h3>순차 실행 (기본)</h3>
+            <pre><code class="language-gdscript"># 순서대로 실행
+func sequential():
+    var tw = create_tween()
+
+    # 1단계: 오른쪽 이동
+    tw.tween_property(
+        self, "position:x", 300, 0.5
+    )
+    # 2단계: 아래 이동
+    tw.tween_property(
+        self, "position:y", 200, 0.5
+    )
+    # 3단계: 페이드아웃
+    tw.tween_property(
+        self, "modulate:a", 0.0, 0.3
+    )
+    # 총 소요시간: 1.3초</code></pre>
+          </div>
+          <div>
+            <h3>병렬 실행</h3>
+            <pre><code class="language-gdscript"># 동시에 실행
+func parallel():
+    var tw = create_tween()
+    tw.set_parallel(true)
+
+    # 모두 동시 시작
+    tw.tween_property(
+        self, "position", Vector2(300, 200), 1.0
+    )
+    tw.tween_property(
+        self, "rotation", PI, 1.0
+    )
+    tw.tween_property(
+        self, "scale", Vector2(2, 2), 1.0
+    )
+    # 총 소요시간: 1.0초</code></pre>
+          </div>
+        </div>
+        <pre><code class="language-gdscript"># 수정자 체이닝
+func advanced_tween():
+    var tw = create_tween()
+    tw.set_loops(3)  # 3회 반복
+
+    # as_relative: 현재 값 기준 상대 이동
+    tw.tween_property(self, "position:x", 100, 0.5).as_relative()
+
+    # from: 시작값 지정
+    tw.tween_property(self, "modulate:a", 1.0, 0.5).from(0.0)
+
+    # from_current: 현재 값에서 시작 (명시적)
+    tw.tween_property(self, "scale", Vector2.ONE, 0.3).from_current()</code></pre>
+      </section>
+
+      <!-- Slide 11: 이징 함수 -->
+      <section data-narration="이징 함수는 애니메이션의 가속과 감속 패턴을 결정합니다. TransitionType은 보간 곡선의 형태를 정의하고, EaseType은 가감속 위치를 지정합니다. TRANS_LINEAR은 등속, TRANS_QUAD는 부드러운 가감속, TRANS_BOUNCE는 탄성 효과, TRANS_BACK은 오버슈트 효과를 만듭니다. 적절한 이징 선택이 애니메이션의 품질을 좌우합니다.">
+        <h2>이징 함수 (Easing)</h2>
+        <div class="key-point">
+          <h3>이징 = 애니메이션의 느낌을 결정하는 곡선</h3>
+          <p><code>set_trans()</code>로 곡선 형태를, <code>set_ease()</code>로 가감속 방향을 설정합니다.</p>
+        </div>
+        <div class="two-columns">
+          <div>
+            <h3>TransitionType</h3>
+            <table class="compare-table">
+              <tr><th>타입</th><th>효과</th></tr>
+              <tr><td><code>TRANS_LINEAR</code></td><td>등속 (일정한 속도)</td></tr>
+              <tr><td><code>TRANS_SINE</code></td><td>부드러운 사인 곡선</td></tr>
+              <tr><td><code>TRANS_QUAD</code></td><td>2차 곡선 (일반적)</td></tr>
+              <tr><td><code>TRANS_CUBIC</code></td><td>3차 곡선 (강한 가감속)</td></tr>
+              <tr><td><code>TRANS_ELASTIC</code></td><td>탄성 진동</td></tr>
+              <tr><td><code>TRANS_BOUNCE</code></td><td>바닥 튀기기</td></tr>
+              <tr><td><code>TRANS_BACK</code></td><td>오버슈트 후 복귀</td></tr>
+              <tr><td><code>TRANS_SPRING</code></td><td>스프링 효과</td></tr>
+            </table>
+          </div>
+          <div>
+            <h3>EaseType</h3>
+            <table class="compare-table">
+              <tr><th>타입</th><th>효과</th></tr>
+              <tr><td><code>EASE_IN</code></td><td>천천히 시작</td></tr>
+              <tr><td><code>EASE_OUT</code></td><td>천천히 끝남</td></tr>
+              <tr><td><code>EASE_IN_OUT</code></td><td>양쪽 모두 부드럽게</td></tr>
+              <tr><td><code>EASE_OUT_IN</code></td><td>중간이 부드럽게</td></tr>
+            </table>
+            <br>
+            <pre><code class="language-gdscript"># 이징 적용 예
+func bounce_in():
+    var tw = create_tween()
+    tw.tween_property(
+        self, "position:y", 0, 0.8
+    ).set_trans(Tween.TRANS_BOUNCE)\
+     .set_ease(Tween.EASE_OUT)
+
+func elastic_scale():
+    var tw = create_tween()
+    tw.tween_property(
+        self, "scale", Vector2.ONE, 0.6
+    ).from(Vector2.ZERO)\
+     .set_trans(Tween.TRANS_ELASTIC)\
+     .set_ease(Tween.EASE_OUT)</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 12: 애니메이션 상태 머신 개념 -->
+      <section data-narration="캐릭터 애니메이션은 여러 상태 간 전환으로 이루어집니다. idle에서 walk로, walk에서 jump로, jump에서 fall로 전환됩니다. 이를 코드로 관리하면 조건문이 복잡해지므로 상태 머신 패턴을 사용합니다. 각 상태를 열거형으로 정의하고, 상태 전환 조건을 명확히 분리하면 유지보수가 쉬워집니다.">
+        <h2>애니메이션 상태 머신 개념</h2>
+        <pre><code class="language-gdscript"># 코드로 구현하는 애니메이션 상태 머신
+extends CharacterBody2D
+
+enum State { IDLE, WALK, JUMP, FALL, ATTACK, HURT }
+var current_state: State = State.IDLE
+
+@onready var anim = $AnimationPlayer
+@onready var sprite = $Sprite2D
+
+func _physics_process(delta):
+    var new_state = determine_state()
+    if new_state != current_state:
+        exit_state(current_state)
+        current_state = new_state
+        enter_state(current_state)
+
+func determine_state() -> State:
+    if current_state == State.HURT:
+        if anim.is_playing():
+            return State.HURT
+    if current_state == State.ATTACK:
+        if anim.is_playing():
+            return State.ATTACK
+    if not is_on_floor():
+        return State.FALL if velocity.y > 0 else State.JUMP
+    if abs(velocity.x) > 10:
+        return State.WALK
+    return State.IDLE
+
+func enter_state(state: State):
+    match state:
+        State.IDLE:   anim.play("idle")
+        State.WALK:   anim.play("walk")
+        State.JUMP:   anim.play("jump")
+        State.FALL:   anim.play("fall")
+        State.ATTACK: anim.play("attack")
+        State.HURT:   anim.play("hurt")
+
+func exit_state(state: State):
+    pass  # 필요시 상태 종료 로직</code></pre>
+      </section>
+
+      <!-- Slide 13: AnimationTree 소개 -->
+      <section data-narration="AnimationTree는 복잡한 애니메이션 전환과 블렌딩을 시각적으로 관리하는 고급 도구입니다. AnimationPlayer에 정의된 애니메이션들을 AnimationTree의 스테이트 머신으로 연결하면, 전환 조건과 블렌딩을 노드 그래프로 설정할 수 있습니다. 코드에서 파라미터 값만 변경하면 AnimationTree가 자동으로 적절한 애니메이션을 재생합니다.">
+        <h2>AnimationTree 소개</h2>
+        <div class="key-point">
+          <h3>AnimationTree = 시각적 애니메이션 제어 시스템</h3>
+          <p>AnimationPlayer의 애니메이션들을 상태 머신, 블렌드 트리 등의 노드 그래프로 연결하여 복잡한 전환과 블렌딩을 관리합니다.</p>
+        </div>
+        <div class="two-columns">
+          <div>
+            <h3>구성 요소</h3>
+            <ul>
+              <li class="fragment"><span class="badge badge-blue">AnimationNodeStateMachine</span> 상태 기반 전환</li>
+              <li class="fragment"><span class="badge badge-green">AnimationNodeBlendTree</span> 블렌드 트리</li>
+              <li class="fragment"><span class="badge badge-orange">AnimationNodeBlendSpace2D</span> 2D 블렌드 스페이스</li>
+              <li class="fragment"><span class="badge badge-red">AnimationNodeTransition</span> 전환 노드</li>
+            </ul>
+          </div>
+          <div>
+            <pre><code class="language-gdscript"># AnimationTree 기본 설정
+@onready var anim_tree = $AnimationTree
+@onready var state_machine: AnimationNodeStateMachinePlayback
+
+func _ready():
+    anim_tree.active = true
+    state_machine = anim_tree.get(
+        "parameters/playback"
+    )
+
+# 상태 전환
+func set_animation_state(state: String):
+    state_machine.travel(state)
+
+# 파라미터 제어
+func _physics_process(delta):
+    anim_tree.set(
+        "parameters/walk_blend/blend_position",
+        velocity.length() / max_speed
+    )</code></pre>
+          </div>
+        </div>
+        <div class="tip">
+          <strong>Tip:</strong> AnimationTree는 AnimationPlayer와 함께 사용해야 합니다. AnimationPlayer에 애니메이션을 먼저 만들고, AnimationTree에서 재생 로직을 관리하는 구조입니다.
+        </div>
+      </section>
+
+      <!-- Slide 14: 블렌드 스페이스 -->
+      <section data-narration="BlendSpace2D는 2차원 파라미터 공간에서 여러 애니메이션을 부드럽게 블렌딩합니다. 예를 들어 X축에 좌우 방향, Y축에 전후 방향을 매핑하면 8방향 이동 애니메이션이 자연스럽게 보간됩니다. 파라미터 값을 캐릭터의 이동 방향 벡터로 설정하면 AnimationTree가 자동으로 가장 적합한 애니메이션을 블렌딩하여 재생합니다.">
+        <h2>블렌드 스페이스 (BlendSpace)</h2>
+        <div class="two-columns">
+          <div>
+            <h3>BlendSpace2D 설정</h3>
+            <pre><code class="language-gdscript"># 8방향 이동 블렌드 스페이스
+# AnimationTree 구조:
+# StateMachine
+#   ├── idle (BlendSpace2D)
+#   │   ├── (-1, 0)  idle_left
+#   │   ├── (1, 0)   idle_right
+#   │   ├── (0, -1)  idle_up
+#   │   └── (0, 1)   idle_down
+#   └── walk (BlendSpace2D)
+#       ├── (-1, 0)  walk_left
+#       ├── (1, 0)   walk_right
+#       ├── (0, -1)  walk_up
+#       └── (0, 1)   walk_down</code></pre>
+          </div>
+          <div>
+            <h3>코드에서 블렌드 제어</h3>
+            <pre><code class="language-gdscript"># 블렌드 스페이스 파라미터 업데이트
+@onready var anim_tree = $AnimationTree
+var blend_path_idle = \
+    "parameters/idle/blend_position"
+var blend_path_walk = \
+    "parameters/walk/blend_position"
+
+func _physics_process(delta):
+    var input = Input.get_vector(
+        "left", "right", "up", "down"
+    )
+
+    if input != Vector2.ZERO:
+        # 이동 중: walk 상태
+        anim_tree.set(
+            blend_path_walk, input
+        )
+        state_machine.travel("walk")
+    else:
+        # 정지: idle 상태
+        state_machine.travel("idle")
+
+    # idle도 마지막 방향 유지
+    if input != Vector2.ZERO:
+        anim_tree.set(
+            blend_path_idle, input
+        )</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 15: 실전 - 캐릭터 애니메이션 시스템 -->
+      <section data-narration="실전 캐릭터 애니메이션 시스템은 입력 처리, 물리 이동, 애니메이션 상태 관리를 통합합니다. 캐릭터의 상태에 따라 적절한 애니메이션을 재생하고, 스프라이트 방향을 뒤집고, 공격이나 피격 같은 일회성 애니메이션은 완료될 때까지 다른 전환을 차단합니다. 이 패턴은 대부분의 2D 액션 게임에 적용할 수 있는 범용 구조입니다.">
+        <h2>실전: 캐릭터 애니메이션 시스템</h2>
+        <pre><code class="language-gdscript"># player.gd - 완전한 캐릭터 애니메이션 시스템
+extends CharacterBody2D
+
+const SPEED = 200.0
+const JUMP_VELOCITY = -350.0
+
+@onready var anim_player = $AnimationPlayer
+@onready var sprite = $Sprite2D
+
+var is_attacking := false
+var facing_right := true
+
+func _ready():
+    anim_player.animation_finished.connect(_on_anim_finished)
+
+func _physics_process(delta):
+    # 중력
+    if not is_on_floor():
+        velocity.y += 980 * delta
+
+    # 입력 처리
+    if not is_attacking:
+        handle_input()
+
+    move_and_slide()
+    update_animation()
+
+func handle_input():
+    var direction = Input.get_axis("left", "right")
+    velocity.x = direction * SPEED
+
+    # 방향 전환
+    if direction > 0:
+        sprite.flip_h = false
+        facing_right = true
+    elif direction < 0:
+        sprite.flip_h = true
+        facing_right = false
+
+    # 점프
+    if Input.is_action_just_pressed("jump") and is_on_floor():
+        velocity.y = JUMP_VELOCITY
+
+    # 공격
+    if Input.is_action_just_pressed("attack"):
+        is_attacking = true
+        velocity.x = 0
+
+func update_animation():
+    if is_attacking:
+        anim_player.play("attack")
+    elif not is_on_floor():
+        anim_player.play("jump" if velocity.y < 0 else "fall")
+    elif abs(velocity.x) > 10:
+        anim_player.play("walk")
+    else:
+        anim_player.play("idle")
+
+func _on_anim_finished(name: StringName):
+    if name == "attack":
+        is_attacking = false</code></pre>
+      </section>
+
+      <!-- Slide 16: 화면 전환 효과 -->
+      <section data-narration="씬 전환 시 화면을 부드럽게 페이드하거나 효과를 주면 게임의 완성도가 크게 올라갑니다. ColorRect를 사용한 페이드 인/아웃, 원형 마스크를 이용한 아이리스 효과, 슬라이드 전환 등 다양한 기법이 있습니다. Autoload 싱글톤으로 전환 매니저를 만들면 어디서든 간편하게 씬 전환 효과를 적용할 수 있습니다.">
+        <h2>화면 전환 효과</h2>
+        <pre><code class="language-gdscript"># transition_manager.gd (Autoload 싱글톤)
+extends CanvasLayer
+
+@onready var color_rect = $ColorRect
+@onready var anim_player = $AnimationPlayer
+
+signal transition_midpoint  # 전환 중간 시점
+
+func _ready():
+    layer = 100  # 최상위 레이어
+    color_rect.color = Color.BLACK
+    color_rect.visible = false
+
+# 페이드 전환
+func fade_to_scene(scene_path: String):
+    color_rect.visible = true
+    # 페이드 아웃 (어두워짐)
+    var tw = create_tween()
+    tw.tween_property(color_rect, "color:a", 1.0, 0.5).from(0.0)
+    tw.tween_callback(func():
+        transition_midpoint.emit()
+        get_tree().change_scene_to_file(scene_path)
+    )
+    tw.tween_interval(0.1)  # 씬 로드 대기
+    # 페이드 인 (밝아짐)
+    tw.tween_property(color_rect, "color:a", 0.0, 0.5)
+    tw.tween_callback(func(): color_rect.visible = false)
+
+# 커스텀 색상 전환
+func flash_white(duration: float = 0.3):
+    color_rect.visible = true
+    color_rect.color = Color.WHITE
+    var tw = create_tween()
+    tw.tween_property(color_rect, "color:a", 1.0, duration * 0.3).from(0.0)
+    tw.tween_property(color_rect, "color:a", 0.0, duration * 0.7)
+    tw.tween_callback(func(): color_rect.visible = false)</code></pre>
+        <pre><code class="language-gdscript"># 사용 예시 (다른 스크립트에서)
+func go_to_next_level():
+    TransitionManager.fade_to_scene("res://scenes/level_2.tscn")
+
+func boss_defeated():
+    TransitionManager.flash_white(0.5)</code></pre>
+      </section>
+
+      <!-- Slide 17: 정리 -->
+      <section data-narration="이번 챕터에서는 Godot의 다양한 애니메이션 도구를 학습했습니다. AnimationPlayer로 키프레임 기반의 복합 애니메이션을, AnimatedSprite2D로 프레임 시퀀스를, Tween으로 코드 기반 간편 보간을, AnimationTree로 상태 머신과 블렌딩을 구현했습니다. 이징 함수로 자연스러운 움직임을 만들고 화면 전환 효과까지 완성했습니다.">
+        <h2>Chapter 08 정리</h2>
+        <div class="key-point">
+          <h3>핵심 요약</h3>
+          <ul>
+            <li class="fragment"><span class="badge badge-blue">AnimationPlayer</span> 만능 애니메이션 도구. 속성/메서드/오디오 트랙 지원</li>
+            <li class="fragment"><span class="badge badge-green">AnimatedSprite2D</span> 프레임 기반 스프라이트 애니메이션. SpriteFrames 리소스 사용</li>
+            <li class="fragment"><span class="badge badge-orange">Tween</span> 코드로 빠르게 만드는 보간 애니메이션. create_tween()으로 생성</li>
+            <li class="fragment"><span class="badge badge-red">AnimationTree</span> 상태 머신과 블렌드 스페이스로 복잡한 전환 관리</li>
+            <li class="fragment"><span class="badge badge-blue">이징 함수</span> TransitionType + EaseType 조합으로 자연스러운 움직임</li>
+          </ul>
+        </div>
+        <table class="compare-table fragment">
+          <tr><th>도구</th><th>적합한 상황</th><th>핵심 함수</th></tr>
+          <tr><td>AnimationPlayer</td><td>복합 타임라인, 컷씬, 캐릭터</td><td>play(), queue(), stop()</td></tr>
+          <tr><td>AnimatedSprite2D</td><td>프레임 교체 스프라이트</td><td>play(), frame, flip_h</td></tr>
+          <tr><td>Tween</td><td>UI 효과, 임시 연출, 간단한 이동</td><td>tween_property(), set_trans()</td></tr>
+          <tr><td>AnimationTree</td><td>상태 기반 전환, 블렌딩</td><td>travel(), set(param, value)</td></tr>
+        </table>
+      </section>
+
+      <!-- Slide 18: 다음 챕터 -->
+      <section class="chapter-title" data-transition="zoom" data-narration="애니메이션 챕터를 완료하셨습니다. AnimationPlayer, Tween, AnimatedSprite2D, AnimationTree까지 게임에 움직임과 생동감을 불어넣는 모든 도구를 익혔습니다. 다음 챕터에서는 AudioStreamPlayer를 활용한 사운드 재생과 AudioBus 시스템, 그리고 GPUParticles2D를 사용한 시각 효과를 학습합니다.">
+        <span class="chapter-number">Next</span>
+        <h1>수고하셨습니다!</h1>
+        <br>
+        <p><a href="09-audio-particles.html" style="color: var(--gd-blue); font-size: 1.2em;">다음 챕터: 오디오와 파티클 &#8594;</a></p>
+        <br>
+        <p><a href="../index.html" style="color: #888; font-size: 0.7em;">&#8592; 목차로 돌아가기</a></p>
+      </section>
+
+    </div>
+  </div>
+  <div class="nav-footer"><a href="../index.html" style="color: #888;">Godot 초보부터 고수까지</a> | Chapter 08</div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/plugin/highlight/highlight.min.js"></script>
+  <script>
+    Reveal.initialize({ hash: true, slideNumber: true, plugins: [RevealHighlight], transition: 'slide', height: 700, center: false, margin: 0.04, minScale: 0.2, maxScale: 1.5, keyboard: { 38: null, 40: null }, mouseWheel: false });
+    document.addEventListener('keydown', function(e) { if (e.keyCode === 38 || e.keyCode === 40) { var slide = Reveal.getCurrentSlide(); if (!slide) return; var amount = 80; if (e.keyCode === 38) { slide.scrollTop -= amount; } else { slide.scrollTop += amount; } e.preventDefault(); e.stopPropagation(); } }, true);
+  </script>
+  <script src="js/narration.js"></script>
+</body>
+</html>

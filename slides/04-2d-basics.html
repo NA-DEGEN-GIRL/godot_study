@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 4: 2D 게임 기초 - Godot 초보부터 고수까지</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/theme/night.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/plugin/highlight/monokai.min.css">
+  <link rel="stylesheet" href="css/custom.css">
+  <link rel="stylesheet" href="css/narration.css">
+</head>
+<body>
+  <div class="reveal">
+    <div class="slides">
+
+      <!-- Slide 1: Title -->
+      <section class="chapter-title" data-transition="zoom" data-narration="챕터 4, 2D 게임 기초에 오신 것을 환영합니다. 이번 챕터에서는 2D 좌표계, 스프라이트, 입력 처리, 캐릭터 이동, 중력과 점프, 카메라 시스템까지 2D 게임을 만들기 위한 핵심 기초를 모두 학습합니다. 직접 플레이어 컨트롤러를 완성하는 것이 이번 챕터의 목표입니다.">
+        <span class="chapter-number">Chapter 04</span>
+        <h1>2D 게임 기초</h1>
+        <p class="subtitle">스프라이트, 입력, 이동, 카메라 - 2D 게임의 모든 것</p>
+        <br>
+        <p><a href="../index.html" style="color: #888; font-size: 0.6em;">&#8592; 목차로 돌아가기</a></p>
+      </section>
+
+      <!-- Slide 2: 2D 좌표계 -->
+      <section data-narration="Godot의 2D 좌표계는 수학에서 배운 것과 약간 다릅니다. 화면 왼쪽 위가 원점이고, X축은 오른쪽으로 갈수록 증가, Y축은 아래로 갈수록 증가합니다. 수학에서는 위로 갈수록 Y가 증가하지만, 대부분의 게임 엔진과 모니터 좌표계에서는 아래가 양의 방향입니다. 이것을 확실히 기억하세요.">
+        <h2>2D 좌표계</h2>
+        <div class="key-point">
+          <h3>핵심: Y축이 아래로 증가!</h3>
+          <p>화면 왼쪽 위 = 원점(0, 0) / 오른쪽 = +X / <strong>아래쪽 = +Y</strong></p>
+        </div>
+        <pre style="background: rgba(71, 140, 191, 0.1); padding: 20px; border-radius: 8px; font-size: 0.75em; color: #e0e0e0; text-align: center;">
+  (0,0) ---------> +X (오른쪽)
+    |
+    |    (200, 150) = 오른쪽 아래 방향
+    |
+    v
+   +Y (아래쪽)
+        </pre>
+        <pre><code class="language-gdscript"># 좌표 관련 핵심 타입
+var pos = Vector2(100, 200)     # 2D 위치 (x, y)
+var dir = Vector2.RIGHT         # (1, 0) 오른쪽
+var up  = Vector2.UP            # (0, -1) 위쪽 (음수!)
+var down = Vector2.DOWN         # (0, 1) 아래쪽
+
+# 자주 쓰는 상수
+Vector2.ZERO     # (0, 0)
+Vector2.ONE      # (1, 1)
+Vector2.LEFT     # (-1, 0)
+Vector2.RIGHT    # (1, 0)
+Vector2.UP       # (0, -1)  -- 중요: 위 = 음수!
+Vector2.DOWN     # (0, 1)</code></pre>
+        <div class="warning fragment">
+          <strong>주의:</strong> 점프 구현 시 <code>velocity.y = -350</code>처럼 <strong>음수</strong>를 줘야 위로 올라갑니다!
+        </div>
+      </section>
+
+      <!-- Slide 3: Sprite2D 노드 -->
+      <section data-narration="Sprite2D는 2D 이미지를 화면에 표시하는 노드입니다. texture 속성에 이미지 리소스를 지정하면 화면에 나타납니다. 주요 속성으로는 위치를 결정하는 offset, 수평 반전의 flip_h, 수직 반전의 flip_v, 색상을 변조하는 modulate 등이 있습니다. 스프라이트 시트를 사용할 때는 hframes와 vframes를 설정합니다.">
+        <h2>Sprite2D 노드</h2>
+        <div class="two-columns">
+          <div>
+            <pre><code class="language-gdscript"># Sprite2D 기본 사용
+extends Sprite2D
+
+func _ready():
+    # 텍스처 로드
+    texture = preload("res://assets/player.png")
+
+    # 주요 속성
+    position = Vector2(400, 300)
+    scale = Vector2(2, 2)      # 2배 확대
+    rotation = 0.0             # 라디안 회전
+    flip_h = false             # 수평 반전
+    flip_v = false             # 수직 반전
+    modulate = Color.WHITE     # 색상 변조
+    self_modulate = Color.RED  # 자식 제외 변조
+    visible = true             # 표시 여부
+    z_index = 0                # 렌더링 순서</code></pre>
+          </div>
+          <div>
+            <h3 style="font-size: 1em;">스프라이트 시트 사용</h3>
+            <pre><code class="language-gdscript"># 스프라이트 시트(한 이미지에 여러 프레임)
+func _ready():
+    texture = preload("res://assets/sheet.png")
+    hframes = 8    # 가로 프레임 수
+    vframes = 4    # 세로 프레임 수
+    frame = 0      # 현재 프레임 인덱스
+
+# 프레임 애니메이션 (간단 버전)
+func _process(delta):
+    frame = wrapi(
+        frame + 1, 0, hframes * vframes
+    )</code></pre>
+            <div class="tip" style="font-size: 0.8em;">
+              <strong>팁:</strong> 정교한 애니메이션은 AnimatedSprite2D 또는 AnimationPlayer 사용
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 4: 텍스처와 리소스 -->
+      <section data-narration="텍스처는 Godot에서 이미지를 표현하는 리소스 타입입니다. PNG, JPG, WebP 등의 이미지 파일을 프로젝트 폴더에 넣으면 자동으로 임포트됩니다. Godot은 리소스를 res 프로토콜로 접근하며, 임포트 설정에서 필터링, 압축 방식 등을 조절할 수 있습니다. 픽셀아트 게임에서는 필터를 반드시 꺼야 합니다.">
+        <h2>텍스처와 리소스 시스템</h2>
+        <pre><code class="language-gdscript"># 리소스 경로 체계
+# res:// = 프로젝트 루트 폴더
+# user:// = 사용자 데이터 폴더 (저장 등)
+
+# 텍스처 로드 방법
+var tex1 = preload("res://assets/sprites/hero.png")     # 컴파일 시
+var tex2 = load("res://assets/sprites/hero.png")         # 런타임
+
+# 텍스처를 코드에서 Sprite2D에 지정
+$Sprite2D.texture = preload("res://icon.svg")</code></pre>
+        <table class="compare-table fragment" style="margin-top: 15px;">
+          <thead>
+            <tr>
+              <th>이미지 포맷</th>
+              <th>용도</th>
+              <th>특징</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="badge badge-green">PNG</span></td>
+              <td>일반적인 게임 그래픽</td>
+              <td>투명도 지원, 무손실 압축</td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-blue">WebP</span></td>
+              <td>용량 절약 필요 시</td>
+              <td>PNG보다 작은 크기, 투명도 지원</td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-orange">SVG</span></td>
+              <td>벡터 아이콘, UI</td>
+              <td>확대해도 깨지지 않음</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="tip fragment">
+          <strong>픽셀아트 설정:</strong> 프로젝트 설정 - Textures - Canvas Textures - Default Texture Filter를 <code>Nearest</code>로!
+        </div>
+      </section>
+
+      <!-- Slide 5: 입력 처리 - Input 싱글톤 -->
+      <section data-narration="Godot에서 키보드, 마우스, 게임패드 입력을 처리하려면 Input 싱글톤을 사용합니다. Input은 어디서든 접근 가능한 전역 객체로, is_action_pressed는 버튼이 눌려 있는 동안 true를 반환하고, is_action_just_pressed는 눌린 순간 한 번만 true를 반환합니다. 이 차이가 매우 중요합니다.">
+        <h2>입력 처리: Input 싱글톤</h2>
+        <div class="key-point">
+          <h3>Input - 전역 입력 매니저</h3>
+          <p>키보드, 마우스, 게임패드 입력을 통합 관리하는 싱글톤 객체</p>
+        </div>
+        <pre><code class="language-gdscript"># 주요 입력 감지 메서드
+func _process(delta):
+    # 누르고 있는 동안 (연속)
+    if Input.is_action_pressed("move_right"):
+        position.x += speed * delta
+
+    # 누른 순간 1회만
+    if Input.is_action_just_pressed("jump"):
+        jump()
+
+    # 뗀 순간 1회만
+    if Input.is_action_just_released("attack"):
+        release_charged_attack()
+
+    # 키보드 직접 감지 (비권장 - Input Map이 더 좋음)
+    if Input.is_key_pressed(KEY_SPACE):
+        pass
+
+    # 마우스 위치
+    var mouse_pos = get_global_mouse_position()
+
+    # 마우스 버튼
+    if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+        shoot_at(mouse_pos)</code></pre>
+      </section>
+
+      <!-- Slide 6: Input Map 설정 -->
+      <section data-narration="Input Map은 물리적 키와 게임 액션을 분리하는 시스템입니다. 프로젝트 설정의 입력 맵 탭에서 move_left, move_right, jump 같은 액션을 정의하고, 여기에 키보드 키, 게임패드 버튼 등을 매핑합니다. 이렇게 하면 나중에 키 변경이 쉽고, 여러 입력 장치를 동시에 지원할 수 있습니다.">
+        <h2>Input Map 설정</h2>
+        <p style="font-size: 0.85em;">프로젝트 - 프로젝트 설정 - 입력 맵 탭</p>
+        <table class="compare-table">
+          <thead>
+            <tr>
+              <th>액션 이름</th>
+              <th>키보드</th>
+              <th>게임패드</th>
+              <th>용도</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="fragment">
+              <td><code>move_left</code></td>
+              <td>A, 왼쪽 화살표</td>
+              <td>L-Stick Left, D-Pad Left</td>
+              <td>왼쪽 이동</td>
+            </tr>
+            <tr class="fragment">
+              <td><code>move_right</code></td>
+              <td>D, 오른쪽 화살표</td>
+              <td>L-Stick Right, D-Pad Right</td>
+              <td>오른쪽 이동</td>
+            </tr>
+            <tr class="fragment">
+              <td><code>move_up</code></td>
+              <td>W, 위쪽 화살표</td>
+              <td>L-Stick Up, D-Pad Up</td>
+              <td>위쪽 이동</td>
+            </tr>
+            <tr class="fragment">
+              <td><code>move_down</code></td>
+              <td>S, 아래쪽 화살표</td>
+              <td>L-Stick Down, D-Pad Down</td>
+              <td>아래쪽 이동</td>
+            </tr>
+            <tr class="fragment">
+              <td><code>jump</code></td>
+              <td>Space</td>
+              <td>A 버튼 (Xbox)</td>
+              <td>점프</td>
+            </tr>
+            <tr class="fragment">
+              <td><code>attack</code></td>
+              <td>Z, Enter</td>
+              <td>X 버튼 (Xbox)</td>
+              <td>공격</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="tip fragment">
+          <strong>팁:</strong> GDScript에서 <code>Input.get_axis("move_left", "move_right")</code>는 -1 ~ +1 범위의 float을 반환합니다.
+        </div>
+      </section>
+
+      <!-- Slide 7: get_axis와 get_vector -->
+      <section data-narration="Input.get_axis는 두 액션을 하나의 축으로 결합하여 마이너스 1에서 플러스 1 사이의 값을 반환합니다. get_vector는 네 방향을 Vector2로 결합합니다. 이 함수들은 아날로그 스틱의 부드러운 입력도 자동으로 처리해 줍니다. 디지털 키보드에서는 정확히 마이너스 1, 0, 플러스 1만 반환됩니다.">
+        <h2>is_action_pressed / get_axis / get_vector</h2>
+        <pre><code class="language-gdscript"># 방법 1: 개별 액션 확인 (기본)
+if Input.is_action_pressed("move_right"):
+    velocity.x = speed
+elif Input.is_action_pressed("move_left"):
+    velocity.x = -speed
+else:
+    velocity.x = 0
+
+# 방법 2: get_axis (1D 축) - 더 간결!
+# 음의 방향 액션, 양의 방향 액션 => -1.0 ~ 1.0
+var dir_x = Input.get_axis("move_left", "move_right")
+velocity.x = dir_x * speed    # -speed, 0, 또는 +speed
+
+# 방법 3: get_vector (2D 벡터) - 4방향을 한 번에!
+# (left, right, up, down) => Vector2
+var input_dir = Input.get_vector("move_left", "move_right", "move_up", "move_down")
+velocity = input_dir * speed
+
+# just_pressed - 순간 입력 (점프, 공격)
+if Input.is_action_just_pressed("jump"):
+    velocity.y = jump_force    # 한 번만 실행됨!</code></pre>
+        <div class="key-point fragment">
+          <h3>규칙</h3>
+          <p><strong>연속 동작</strong>(이동) = <code>is_action_pressed</code> / <code>get_axis</code><br>
+          <strong>순간 동작</strong>(점프, 공격) = <code>is_action_just_pressed</code></p>
+        </div>
+      </section>
+
+      <!-- Slide 8: CharacterBody2D -->
+      <section data-narration="CharacterBody2D는 플레이어나 NPC처럼 코드로 직접 이동을 제어하는 2D 물리 바디입니다. velocity 속성에 속도를 설정하고 move_and_slide를 호출하면, 충돌 감지와 슬라이딩을 자동으로 처리해 줍니다. Godot 4에서는 velocity가 내장 속성이라 별도 변수 선언이 필요 없습니다.">
+        <h2>CharacterBody2D</h2>
+        <div class="key-point">
+          <h3>CharacterBody2D = 제어 가능한 물리 바디</h3>
+          <p>코드로 이동을 직접 제어하면서, 충돌 감지와 벽 슬라이딩을 자동 처리</p>
+        </div>
+        <pre><code class="language-gdscript">extends CharacterBody2D
+
+@export var speed := 300.0
+
+func _physics_process(delta):
+    # velocity는 CharacterBody2D의 내장 속성 (Vector2)
+    var direction = Input.get_axis("move_left", "move_right")
+    velocity.x = direction * speed
+
+    # move_and_slide() 호출 - 핵심!
+    # 1) velocity 방향으로 이동 시도
+    # 2) 충돌 시 벽을 따라 미끄러짐
+    # 3) 결과가 velocity에 반영됨
+    move_and_slide()</code></pre>
+        <div class="two-columns fragment">
+          <div>
+            <h3 style="font-size: 0.9em; color: var(--gd-green);">필수 자식 노드</h3>
+            <ul style="font-size: 0.8em;">
+              <li><strong>CollisionShape2D</strong> - 충돌 영역 정의</li>
+              <li><strong>Sprite2D</strong> - 시각적 표현</li>
+            </ul>
+          </div>
+          <div>
+            <h3 style="font-size: 0.9em; color: var(--gd-blue);">유용한 메서드</h3>
+            <ul style="font-size: 0.8em;">
+              <li><code>is_on_floor()</code> - 바닥에 있는가?</li>
+              <li><code>is_on_wall()</code> - 벽에 닿았는가?</li>
+              <li><code>is_on_ceiling()</code> - 천장에 닿았는가?</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 9: move_and_slide 상세 -->
+      <section data-narration="move_and_slide는 CharacterBody2D의 핵심 메서드입니다. 이 함수는 velocity를 기반으로 이동을 시도하고, 충돌이 발생하면 벽을 따라 미끄러집니다. 바닥 판정을 위해 up_direction을 설정해야 하며, 기본값은 Vector2.UP입니다. floor_max_angle로 경사면의 최대 각도를 지정할 수 있습니다.">
+        <h2>move_and_slide() 상세</h2>
+        <pre><code class="language-gdscript">extends CharacterBody2D
+
+# CharacterBody2D의 인스펙터 설정 (코드로도 가능)
+# Motion Mode: Grounded (플랫포머) 또는 Floating (탑다운)
+# Up Direction: Vector2(0, -1) = 위쪽이 천장 방향
+# Floor Max Angle: 45도 = 이 각도까지는 바닥으로 인식
+
+func _physics_process(delta):
+    velocity.x = Input.get_axis("move_left", "move_right") * 300
+
+    move_and_slide()
+
+    # move_and_slide 호출 후 충돌 정보 확인
+    print("바닥:", is_on_floor())      # 바닥 위에 서 있는가
+    print("벽:", is_on_wall())          # 벽에 닿았는가
+    print("천장:", is_on_ceiling())     # 천장에 부딪혔는가
+
+    # 충돌 상세 정보
+    for i in get_slide_collision_count():
+        var collision = get_slide_collision(i)
+        print("충돌 대상:", collision.get_collider().name)
+        print("충돌 법선:", collision.get_normal())
+        print("충돌 위치:", collision.get_position())</code></pre>
+        <div class="tip fragment">
+          <strong>Motion Mode:</strong> 플랫포머(횡스크롤) = <code>Grounded</code>, 탑다운(RPG) = <code>Floating</code>
+        </div>
+      </section>
+
+      <!-- Slide 10: 8방향 이동 (탑다운) -->
+      <section data-narration="탑다운 게임에서는 상하좌우 8방향으로 이동합니다. get_vector를 사용하면 네 방향 입력을 하나의 Vector2로 쉽게 받을 수 있습니다. 중요한 점은 대각선 이동 시 속도가 루트2배로 빨라지는 문제를 normalized로 해결해야 한다는 것입니다. normalized는 벡터의 길이를 1로 만들어 줍니다.">
+        <h2>8방향 이동 (탑다운 게임)</h2>
+        <pre><code class="language-gdscript">extends CharacterBody2D
+
+@export var speed := 200.0
+
+func _physics_process(delta):
+    # 4방향 입력을 Vector2로 받기
+    var input_dir = Input.get_vector(
+        "move_left", "move_right",
+        "move_up", "move_down"
+    )
+
+    # normalized() 필수! 대각선 속도 보정
+    # 대각선: (1,1).length() = 1.414... (너무 빠름!)
+    # normalized: (0.707, 0.707).length() = 1.0 (정상)
+    velocity = input_dir.normalized() * speed
+
+    move_and_slide()
+
+    # 스프라이트 방향 전환
+    if input_dir.x != 0:
+        $Sprite2D.flip_h = input_dir.x < 0</code></pre>
+        <div class="two-columns fragment">
+          <div class="warning" style="font-size: 0.8em;">
+            <strong>normalized() 미적용:</strong><br>
+            대각선 이동 시 속도가 약 1.41배로 빨라짐
+          </div>
+          <div class="tip" style="font-size: 0.8em;">
+            <strong>normalized() 적용:</strong><br>
+            모든 방향에서 동일한 속도 보장 (벡터 길이 = 1)
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 11: 중력 적용 -->
+      <section data-narration="플랫포머 게임에서는 캐릭터에 중력을 적용해야 합니다. 매 프레임 velocity.y에 중력 값을 더하면 아래로 가속됩니다. 바닥에 있을 때는 중력을 적용하지 않아야 뚫고 내려가지 않습니다. Godot 프로젝트 설정에서 기본 중력 값을 지정할 수 있고, 이를 코드에서 불러올 수도 있습니다.">
+        <h2>중력 적용 (플랫포머)</h2>
+        <pre><code class="language-gdscript">extends CharacterBody2D
+
+@export var speed := 300.0
+@export var gravity := 980.0        # 픽셀/초^2
+# 또는 프로젝트 설정에서 가져오기:
+# var gravity = ProjectSettings.get_setting("physics/2d/default_gravity")
+
+func _physics_process(delta):
+    # 바닥에 있지 않을 때만 중력 적용
+    if not is_on_floor():
+        velocity.y += gravity * delta   # 가속도 = 속도 증가
+        # 최대 낙하 속도 제한 (선택)
+        velocity.y = min(velocity.y, 800.0)
+
+    # 좌우 이동
+    var dir = Input.get_axis("move_left", "move_right")
+    velocity.x = dir * speed
+
+    move_and_slide()</code></pre>
+        <div class="key-point fragment">
+          <h3>중력 공식 이해</h3>
+          <p><code>velocity.y += gravity * delta</code><br>
+          delta가 0.016(60fps)이면: 매 프레임 약 15.7 px/s 씩 낙하 속도 증가<br>
+          중력은 <strong>가속도</strong>이므로, 시간이 지날수록 점점 빨라짐 (자연스러운 낙하)</p>
+        </div>
+      </section>
+
+      <!-- Slide 12: 점프 구현 -->
+      <section data-narration="점프는 바닥에 서 있을 때 velocity.y에 음수 값을 넣어 구현합니다. 음수인 이유는 Y축이 아래로 증가하기 때문에, 위로 이동하려면 음수 방향이어야 합니다. 코요테 타임은 바닥을 벗어난 직후에도 짧은 시간 동안 점프를 허용하는 기법으로, 플레이 감각을 크게 향상시킵니다.">
+        <h2>점프 구현</h2>
+        <pre><code class="language-gdscript">extends CharacterBody2D
+
+@export var speed := 300.0
+@export var jump_force := -400.0    # 음수! (위로 가야 하니까)
+@export var gravity := 980.0
+
+func _physics_process(delta):
+    # 중력
+    if not is_on_floor():
+        velocity.y += gravity * delta
+
+    # 점프 - 바닥에 있을 때만!
+    if Input.is_action_just_pressed("jump") and is_on_floor():
+        velocity.y = jump_force
+
+    # 점프 높이 조절 (버튼을 빨리 떼면 낮게 점프)
+    if Input.is_action_just_released("jump") and velocity.y < 0:
+        velocity.y *= 0.5    # 상승 속도를 절반으로
+
+    # 좌우 이동
+    velocity.x = Input.get_axis("move_left", "move_right") * speed
+
+    move_and_slide()</code></pre>
+        <div class="tip fragment">
+          <strong>코요테 타임 (Coyote Time):</strong> 바닥을 벗어난 후 0.1초간 점프 허용 - 절벽 끝에서 떨어질 때 유예 시간 부여
+        </div>
+        <pre class="fragment"><code class="language-gdscript"># 코요테 타임 구현
+var coyote_timer := 0.0
+const COYOTE_TIME := 0.1
+
+func _physics_process(delta):
+    if is_on_floor():
+        coyote_timer = COYOTE_TIME
+    else:
+        coyote_timer -= delta
+
+    if Input.is_action_just_pressed("jump") and coyote_timer > 0:
+        velocity.y = jump_force
+        coyote_timer = 0.0</code></pre>
+      </section>
+
+      <!-- Slide 13: KinematicCollision2D -->
+      <section data-narration="move_and_slide 호출 후 get_slide_collision으로 충돌 정보를 얻을 수 있습니다. KinematicCollision2D 객체에는 충돌한 상대 노드, 충돌 위치, 법선 벡터 등이 담겨 있습니다. 이를 활용하면 적과 부딪혔을 때 데미지를 주거나, 특정 표면에서만 동작하는 로직을 구현할 수 있습니다.">
+        <h2>KinematicCollision2D - 충돌 정보</h2>
+        <pre><code class="language-gdscript">extends CharacterBody2D
+
+func _physics_process(delta):
+    velocity.y += 980 * delta
+    velocity.x = Input.get_axis("move_left", "move_right") * 300
+    move_and_slide()
+
+    # 충돌 정보 순회
+    for i in get_slide_collision_count():
+        var collision: KinematicCollision2D = get_slide_collision(i)
+
+        # 충돌한 상대 노드
+        var collider = collision.get_collider()
+        print("충돌 대상: ", collider.name)
+
+        # 충돌 법선 (표면 방향)
+        var normal = collision.get_normal()
+        # normal.y < 0 = 바닥, normal.x != 0 = 벽
+
+        # 실전 예시: 적과 충돌 시 데미지
+        if collider.is_in_group("enemies"):
+            if normal.y < -0.5:
+                # 위에서 밟음 = 적 처치
+                collider.die()
+                velocity.y = -200  # 밟기 반동
+            else:
+                # 옆에서 부딪힘 = 데미지
+                take_damage(1)</code></pre>
+      </section>
+
+      <!-- Slide 14: Camera2D -->
+      <section data-narration="Camera2D 노드는 게임의 뷰포트를 제어합니다. 플레이어의 자식 노드로 배치하면 자동으로 플레이어를 따라갑니다. position_smoothing을 활성화하면 부드러운 카메라 추적 효과를 얻을 수 있고, limit 속성으로 카메라가 맵 밖으로 나가지 않도록 제한할 수 있습니다.">
+        <h2>Camera2D - 카메라 시스템</h2>
+        <div class="two-columns">
+          <div>
+            <h3 style="font-size: 1em;">기본 설정</h3>
+            <pre><code class="language-gdscript"># Player 씬 구조:
+# CharacterBody2D (Player)
+#   +-- Sprite2D
+#   +-- CollisionShape2D
+#   +-- Camera2D     <-- 자식으로!
+
+# Camera2D 인스펙터 설정
+# Enabled: true (활성화)
+# Process Callback: Physics
+# Anchor Mode: Drag Center</code></pre>
+          </div>
+          <div>
+            <h3 style="font-size: 1em;">코드 제어</h3>
+            <pre><code class="language-gdscript"># camera2d_setup.gd
+extends Camera2D
+
+func _ready():
+    # 활성 카메라로 설정
+    make_current()
+
+    # 부드러운 추적
+    position_smoothing_enabled = true
+    position_smoothing_speed = 5.0
+
+    # 줌 레벨
+    zoom = Vector2(2, 2)  # 2배 확대
+
+    # 카메라 범위 제한
+    limit_left = 0
+    limit_top = 0
+    limit_right = 3200
+    limit_bottom = 1800</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 15: 카메라 추적과 줌 -->
+      <section data-narration="카메라의 스무딩 기능은 갑작스러운 이동을 부드럽게 만들어 줍니다. position_smoothing_speed 값이 낮을수록 느리게 따라가고, 높을수록 빠르게 따라갑니다. 줌은 Vector2로 설정하며 값이 클수록 확대됩니다. 런타임에 줌을 변경하면 카메라 연출 효과를 만들 수 있습니다.">
+        <h2>카메라 추적, 스무딩, 줌</h2>
+        <pre><code class="language-gdscript">extends Camera2D
+
+@export var shake_strength := 0.0
+var target_zoom := Vector2(2, 2)
+
+func _process(delta):
+    # 화면 흔들기 효과
+    if shake_strength > 0:
+        offset = Vector2(
+            randf_range(-shake_strength, shake_strength),
+            randf_range(-shake_strength, shake_strength)
+        )
+        shake_strength = lerp(shake_strength, 0.0, 10.0 * delta)
+    else:
+        offset = Vector2.ZERO
+
+    # 부드러운 줌 전환
+    zoom = zoom.lerp(target_zoom, 5.0 * delta)
+
+# 외부에서 호출하는 함수
+func shake(intensity: float):
+    shake_strength = intensity
+
+func zoom_to(level: float):
+    target_zoom = Vector2(level, level)</code></pre>
+        <table class="compare-table fragment" style="font-size: 0.85em;">
+          <thead>
+            <tr>
+              <th>스무딩 값</th>
+              <th>효과</th>
+              <th>적합한 장르</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>1 ~ 3</td><td>느리고 부드럽게 추적</td><td>탐험, 퍼즐</td></tr>
+            <tr><td>5 ~ 8</td><td>중간 추적 속도</td><td>플랫포머, 액션</td></tr>
+            <tr><td>10 ~ 20</td><td>빠르게 밀착 추적</td><td>슈팅, 레이싱</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- Slide 16: 게임 루프 이해 -->
+      <section data-narration="게임 루프는 매 프레임마다 반복되는 처리 순서입니다. 입력 처리, 물리 연산, 프로세스 실행, 렌더링 순으로 진행됩니다. physics_process는 기본 60Hz로 고정되어 있어 물리 연산에 적합하고, process는 디스플레이 주사율에 맞춰 호출되어 가변 프레임입니다. 물리 관련 코드는 반드시 physics_process에 넣어야 합니다.">
+        <h2>게임 루프(Game Loop) 이해</h2>
+        <pre style="background: rgba(71, 140, 191, 0.1); padding: 15px; border-radius: 8px; font-size: 0.7em; color: #e0e0e0; text-align: center;">
+[입력 처리] ---> [_physics_process 60Hz 고정] ---> [_process 가변 FPS] ---> [렌더링] ---> 반복
+   Input          물리 / 이동 / 충돌            시각 / UI / 비물리          화면 출력
+        </pre>
+        <div class="two-columns">
+          <div>
+            <h3 style="font-size: 1em; color: var(--gd-green);">_physics_process(delta)</h3>
+            <ul style="font-size: 0.8em;">
+              <li>고정 60Hz (기본값)</li>
+              <li class="fragment">물리 이동, 충돌 감지</li>
+              <li class="fragment">move_and_slide() 호출</li>
+              <li class="fragment">delta = 항상 약 0.0167초</li>
+              <li class="fragment">일관된 물리 시뮬레이션</li>
+            </ul>
+          </div>
+          <div>
+            <h3 style="font-size: 1em; color: var(--gd-blue);">_process(delta)</h3>
+            <ul style="font-size: 0.8em;">
+              <li>가변 FPS (모니터 주사율)</li>
+              <li class="fragment">애니메이션, UI 업데이트</li>
+              <li class="fragment">시각 효과, 카메라</li>
+              <li class="fragment">delta = 프레임마다 다름</li>
+              <li class="fragment">부드러운 비주얼 처리</li>
+            </ul>
+          </div>
+        </div>
+        <div class="warning fragment">
+          <strong>규칙:</strong> CharacterBody2D의 velocity/move_and_slide는 반드시 <code>_physics_process</code>에서!
+        </div>
+      </section>
+
+      <!-- Slide 17: delta time 깊이 이해 -->
+      <section data-narration="delta는 이전 프레임에서 현재 프레임까지의 경과 시간(초)입니다. 이동 속도에 delta를 곱하면 프레임률에 상관없이 같은 속도로 이동합니다. 60fps에서 delta는 약 0.0167이고, 30fps에서는 약 0.033입니다. delta를 곱하지 않으면 프레임률이 높은 컴퓨터에서 게임이 더 빨라지는 문제가 생깁니다.">
+        <h2>Delta Time 깊이 이해</h2>
+        <div class="key-point">
+          <h3>delta = 프레임 간 경과 시간(초)</h3>
+          <p>속도에 delta를 곱하면 프레임률에 독립적인 일정한 이동을 보장</p>
+        </div>
+        <div class="two-columns">
+          <div>
+            <h3 style="font-size: 0.9em; color: var(--gd-red);">delta 미사용 (잘못된 방법)</h3>
+            <pre><code class="language-gdscript"># 프레임률에 종속!
+func _process(delta):
+    position.x += 5
+    # 60fps: 초당 300px 이동
+    # 120fps: 초당 600px 이동!
+    # 30fps: 초당 150px 이동...</code></pre>
+          </div>
+          <div>
+            <h3 style="font-size: 0.9em; color: var(--gd-green);">delta 사용 (올바른 방법)</h3>
+            <pre><code class="language-gdscript"># 프레임률 독립적!
+func _process(delta):
+    position.x += 300 * delta
+    # 60fps: 300 * 0.0167 = ~5px/프레임
+    # 120fps: 300 * 0.0083 = ~2.5px/프레임
+    # 결과: 항상 초당 300px!</code></pre>
+          </div>
+        </div>
+        <table class="compare-table fragment" style="margin-top: 10px;">
+          <thead>
+            <tr><th>FPS</th><th>delta 값</th><th>300 * delta</th><th>초당 이동</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>30</td><td>0.0333</td><td>~10.0 px</td><td>300 px/s</td></tr>
+            <tr><td>60</td><td>0.0167</td><td>~5.0 px</td><td>300 px/s</td></tr>
+            <tr><td>120</td><td>0.0083</td><td>~2.5 px</td><td>300 px/s</td></tr>
+            <tr><td>144</td><td>0.0069</td><td>~2.1 px</td><td>300 px/s</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- Slide 18: 간단한 플랫포머 컨트롤러 전체 코드 -->
+      <section data-narration="지금까지 배운 모든 개념을 합친 플랫포머 캐릭터 컨트롤러 전체 코드입니다. 중력, 점프, 좌우 이동, 스프라이트 반전, 간단한 애니메이션 전환까지 포함되어 있습니다. 이 코드를 기반으로 자신만의 캐릭터를 만들어 보세요. 실제 프로젝트에서는 여기에 공격, 대시 등 추가 기능을 넣게 됩니다.">
+        <h2>완성: 플랫포머 컨트롤러</h2>
+        <pre><code class="language-gdscript" style="font-size: 0.72em;"># player.gd - 플랫포머 캐릭터 컨트롤러 전체 코드
+extends CharacterBody2D
+
+# === 이동 파라미터 (인스펙터에서 조절 가능) ===
+@export_group("Movement")
+@export var speed := 300.0
+@export var acceleration := 1500.0   # 가속도
+@export var friction := 1200.0       # 마찰력
+
+@export_group("Jump")
+@export var jump_force := -420.0
+@export var gravity := 980.0
+@export var max_fall_speed := 600.0
+
+# === 노드 참조 ===
+@onready var sprite := $Sprite2D
+@onready var anim := $AnimationPlayer
+
+func _physics_process(delta: float) -&gt; void:
+    apply_gravity(delta)
+    handle_jump()
+    handle_movement(delta)
+    update_animation()
+    move_and_slide()
+
+func apply_gravity(delta: float) -&gt; void:
+    if not is_on_floor():
+        velocity.y += gravity * delta
+        velocity.y = min(velocity.y, max_fall_speed)
+
+func handle_jump() -&gt; void:
+    if Input.is_action_just_pressed("jump") and is_on_floor():
+        velocity.y = jump_force
+    # 가변 점프 높이
+    if Input.is_action_just_released("jump") and velocity.y &lt; 0:
+        velocity.y *= 0.5
+
+func handle_movement(delta: float) -&gt; void:
+    var dir := Input.get_axis("move_left", "move_right")
+    if dir != 0:
+        velocity.x = move_toward(velocity.x, dir * speed, acceleration * delta)
+        sprite.flip_h = dir &lt; 0
+    else:
+        velocity.x = move_toward(velocity.x, 0, friction * delta)
+
+func update_animation() -&gt; void:
+    if not is_on_floor():
+        anim.play("jump" if velocity.y &lt; 0 else "fall")
+    elif abs(velocity.x) &gt; 10:
+        anim.play("run")
+    else:
+        anim.play("idle")</code></pre>
+      </section>
+
+      <!-- Slide 19: 탑다운 컨트롤러 전체 코드 -->
+      <section data-narration="플랫포머 외에 탑다운 방식의 컨트롤러도 살펴봅시다. 탑다운 게임에서는 중력이 없고 상하좌우 모든 방향으로 이동합니다. get_vector로 입력 방향을 받고 normalized로 대각선 보정을 합니다. 이 패턴은 RPG, 액션, 슈팅 등 다양한 탑다운 게임에 적용됩니다.">
+        <h2>완성: 탑다운 컨트롤러</h2>
+        <pre><code class="language-gdscript" style="font-size: 0.75em;"># top_down_player.gd - 탑다운 캐릭터 컨트롤러
+extends CharacterBody2D
+
+@export var speed := 200.0
+@export var acceleration := 800.0
+@export var friction := 600.0
+
+@onready var sprite := $Sprite2D
+@onready var anim := $AnimationPlayer
+
+func _physics_process(delta: float) -&gt; void:
+    # 4방향 입력 (대각선 자동 정규화)
+    var input_dir := Input.get_vector(
+        "move_left", "move_right", "move_up", "move_down"
+    )
+
+    # 가속/감속 처리
+    if input_dir != Vector2.ZERO:
+        velocity = velocity.move_toward(
+            input_dir.normalized() * speed, acceleration * delta
+        )
+        # 스프라이트 방향
+        sprite.flip_h = input_dir.x &lt; 0
+        anim.play("walk")
+    else:
+        velocity = velocity.move_toward(Vector2.ZERO, friction * delta)
+        anim.play("idle")
+
+    move_and_slide()
+
+    # 마우스 방향 바라보기 (선택 사항)
+    # var mouse_dir = global_position.direction_to(get_global_mouse_position())
+    # rotation = mouse_dir.angle()</code></pre>
+      </section>
+
+      <!-- Slide 20: 정리 + 다음 챕터 -->
+      <section data-narration="챕터 4에서 배운 핵심 내용을 정리합니다. 2D 좌표계에서 Y축은 아래로 증가하고, Sprite2D로 이미지를 표시합니다. Input 싱글톤과 Input Map으로 입력을 처리하고, CharacterBody2D와 move_and_slide로 캐릭터를 이동시킵니다. 중력, 점프, 카메라까지 기본 2D 게임의 모든 요소를 다루었습니다.">
+        <h2>Chapter 04 정리</h2>
+        <table class="compare-table" style="font-size: 0.8em;">
+          <thead>
+            <tr><th>개념</th><th>핵심 코드/설명</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>2D 좌표계</td><td>Y축 아래로 증가, <code>Vector2.UP = (0, -1)</code></td></tr>
+            <tr><td>Sprite2D</td><td><code>texture, flip_h, modulate, hframes</code></td></tr>
+            <tr><td>입력 처리</td><td><code>Input.is_action_pressed/just_pressed, get_axis, get_vector</code></td></tr>
+            <tr><td>CharacterBody2D</td><td><code>velocity + move_and_slide()</code></td></tr>
+            <tr><td>중력/점프</td><td><code>velocity.y += gravity * delta</code> / <code>velocity.y = jump_force</code></td></tr>
+            <tr><td>Camera2D</td><td><code>position_smoothing, zoom, limit, shake</code></td></tr>
+            <tr><td>delta time</td><td>프레임률 독립적 이동: <code>speed * delta</code></td></tr>
+          </tbody>
+        </table>
+        <div class="key-point fragment">
+          <h3>다음 단계</h3>
+          <p>캐릭터가 움직이게 되었으니, 다음 챕터에서는 <strong>물리 엔진과 충돌 처리</strong>를 깊이 학습합니다. RigidBody2D, Area2D, 충돌 레이어/마스크 시스템을 다룹니다.</p>
+        </div>
+      </section>
+
+      <!-- Slide 21: 다음 챕터 (실질적 20번째 내용 슬라이드 + 이 마무리) -->
+      <section class="chapter-title" data-transition="zoom" data-narration="챕터 4, 2D 게임 기초를 마무리합니다. 이번 챕터에서 2D 게임의 기초를 확실히 다지셨습니다. 직접 플레이어 컨트롤러를 만들어 보고, 파라미터를 조절하며 감각을 익혀 보세요. 다음 챕터에서는 물리와 충돌 시스템을 본격적으로 배워, 게임 세계와 상호작용하는 방법을 학습합니다.">
+        <span class="chapter-number">Next</span>
+        <h1>수고하셨습니다!</h1>
+        <br>
+        <p><a href="05-physics-collision.html" style="color: var(--gd-blue); font-size: 1.2em;">다음 챕터: 물리와 충돌 &#8594;</a></p>
+        <br>
+        <p><a href="../index.html" style="color: #888; font-size: 0.7em;">&#8592; 목차로 돌아가기</a></p>
+      </section>
+
+    </div>
+  </div>
+
+  <div class="nav-footer">
+    <a href="../index.html" style="color: #888;">Godot 초보부터 고수까지</a> | Chapter 04
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/plugin/highlight/highlight.min.js"></script>
+  <script>
+    Reveal.initialize({
+      hash: true, slideNumber: true, plugins: [RevealHighlight], transition: 'slide',
+      height: 700, center: false, margin: 0.04, minScale: 0.2, maxScale: 1.5,
+      keyboard: { 38: null, 40: null }, mouseWheel: false
+    });
+    document.addEventListener('keydown', function(e) {
+      if (e.keyCode === 38 || e.keyCode === 40) {
+        var slide = Reveal.getCurrentSlide();
+        if (!slide) return;
+        var amount = 80;
+        if (e.keyCode === 38) { slide.scrollTop -= amount; } else { slide.scrollTop += amount; }
+        e.preventDefault(); e.stopPropagation();
+      }
+    }, true);
+  </script>
+  <script src="js/narration.js"></script>
+</body>
+</html>

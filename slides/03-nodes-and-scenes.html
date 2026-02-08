@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 3: 노드와 씬 - Godot 초보부터 고수까지</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/theme/night.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/plugin/highlight/monokai.min.css">
+  <link rel="stylesheet" href="css/custom.css">
+  <link rel="stylesheet" href="css/narration.css">
+</head>
+<body>
+  <div class="reveal">
+    <div class="slides">
+
+      <!-- Slide 1: Title -->
+      <section class="chapter-title" data-transition="zoom" data-narration="챕터 3, 노드와 씬에 오신 것을 환영합니다. 이번 챕터에서는 Godot 엔진의 가장 핵심적인 개념인 노드와 씬을 깊이 있게 학습합니다. 노드 트리의 구조, 주요 노드 타입, 씬의 저장과 인스턴싱, 그리고 노드의 생명주기까지 Godot으로 게임을 만들기 위한 필수 기초를 다집니다.">
+        <span class="chapter-number">Chapter 03</span>
+        <h1>노드와 씬</h1>
+        <p class="subtitle">Godot의 심장 - 모든 것은 노드로 이루어진다</p>
+        <br>
+        <p><a href="../index.html" style="color: #888; font-size: 0.6em;">&#8592; 목차로 돌아가기</a></p>
+      </section>
+
+      <!-- Slide 2: 노드란 무엇인가 -->
+      <section data-narration="노드는 Godot 엔진의 가장 기본적인 빌딩 블록입니다. 게임 내 모든 요소는 노드로 구성되며, 캐릭터, 배경, UI, 사운드 등 눈에 보이는 것과 보이지 않는 것 모두가 노드입니다. 레고 블록처럼 작은 노드를 조합하여 복잡한 게임 오브젝트를 만드는 것이 Godot의 설계 철학입니다.">
+        <h2>노드(Node)란 무엇인가?</h2>
+        <div class="key-point">
+          <h3>핵심 개념</h3>
+          <p><strong>노드(Node)</strong>는 Godot에서 게임을 구성하는 <span style="color: var(--gd-blue);">가장 작은 단위</span>입니다.<br>
+          모든 게임 오브젝트는 하나 이상의 노드로 구성됩니다.</p>
+        </div>
+        <ul>
+          <li class="fragment">게임 내 모든 요소(캐릭터, 배경, UI, 사운드)는 <strong>노드</strong></li>
+          <li class="fragment">노드는 <strong>이름</strong>, <strong>속성</strong>, <strong>콜백 함수</strong>를 가짐</li>
+          <li class="fragment">작은 노드를 조합하여 복잡한 오브젝트를 구성 (컴포지션 패턴)</li>
+          <li class="fragment">레고 블록처럼 조립하는 방식 = Godot의 설계 철학</li>
+        </ul>
+        <div class="tip fragment">
+          <strong>비유:</strong> 노드 = 레고 블록 한 개, 씬 = 레고로 완성한 자동차나 집
+        </div>
+      </section>
+
+      <!-- Slide 3: 노드 트리 구조 -->
+      <section data-narration="Godot의 노드는 트리 구조로 조직됩니다. 최상위에 루트 노드가 있고, 그 아래에 자식 노드가 계층적으로 연결됩니다. 부모 노드의 변환은 자식에게 상속되므로, 부모를 이동하면 자식도 함께 이동합니다. 이 계층적 트리 구조를 정확히 이해하는 것이 Godot 개발의 중요한 첫걸음입니다.">
+        <h2>노드 트리(Node Tree) 구조</h2>
+        <div class="two-columns">
+          <div>
+            <pre><code class="language-gdscript" style="font-size: 0.75em;"># 트리 구조 예시 (플레이어)
+Game (Node2D)            # 루트
+ +-- Player (CharacterBody2D)
+ |    +-- Sprite2D       # 외형
+ |    +-- CollisionShape2D  # 충돌
+ |    +-- AnimationPlayer   # 애니메이션
+ |    +-- Camera2D       # 카메라
+ +-- World (Node2D)
+ |    +-- TileMap        # 지형
+ |    +-- Enemies (Node2D)
+ |         +-- Slime
+ |         +-- Bat
+ +-- UI (CanvasLayer)
+      +-- HUD
+      +-- PauseMenu</code></pre>
+          </div>
+          <div>
+            <h3 style="font-size: 1em;">트리의 특징</h3>
+            <ul style="font-size: 0.85em;">
+              <li class="fragment"><strong>루트 노드:</strong> 트리의 최상단</li>
+              <li class="fragment"><strong>부모-자식 관계:</strong> 계층적 구조</li>
+              <li class="fragment"><strong>변환 상속:</strong> 위치/회전/크기가 부모 기준</li>
+              <li class="fragment"><strong>처리 순서:</strong> 위에서 아래로 순회</li>
+            </ul>
+            <div class="warning fragment" style="font-size: 0.8em;">
+              순환 참조 불가 - 자식이 부모가 될 수 없음
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 4: 주요 노드 타입들 -->
+      <section data-narration="Godot에는 수십 가지 노드 타입이 있지만, 가장 기본이 되는 것은 네 가지입니다. Node는 최상위 기본 클래스이고, Node2D는 2D 게임용, Node3D는 3D 게임용, Control은 UI용 기본 클래스입니다. 이 네 가지에서 파생된 수많은 전문 노드가 있습니다.">
+        <h2>주요 노드 타입 계층</h2>
+        <table class="compare-table">
+          <thead>
+            <tr>
+              <th>기본 클래스</th>
+              <th>용도</th>
+              <th>대표 하위 노드</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="fragment">
+              <td><span class="badge badge-blue">Node</span></td>
+              <td>최상위 기본 클래스 (비시각적)</td>
+              <td>Timer, AudioStreamPlayer, AnimationPlayer</td>
+            </tr>
+            <tr class="fragment">
+              <td><span class="badge badge-green">Node2D</span></td>
+              <td>2D 게임 오브젝트</td>
+              <td>Sprite2D, CharacterBody2D, TileMap, Camera2D</td>
+            </tr>
+            <tr class="fragment">
+              <td><span class="badge badge-orange">Node3D</span></td>
+              <td>3D 게임 오브젝트</td>
+              <td>MeshInstance3D, CharacterBody3D, Camera3D</td>
+            </tr>
+            <tr class="fragment">
+              <td><span class="badge badge-red">Control</span></td>
+              <td>UI 요소</td>
+              <td>Button, Label, TextureRect, VBoxContainer</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="tip fragment" style="margin-top: 15px;">
+          <strong>팁:</strong> 에디터 왼쪽 상단의 + 버튼으로 노드를 추가할 때, 검색창을 활용하면 빠르게 찾을 수 있습니다.
+        </div>
+      </section>
+
+      <!-- Slide 5: Node2D와 Control 상세 -->
+      <section data-narration="Node2D는 position, rotation, scale 같은 2D 변환 속성을 가지며, 모든 2D 게임 오브젝트의 기반입니다. Control은 UI에 특화된 노드로 앵커, 마진, 사이즈 플래그 같은 레이아웃 속성을 갖고 있습니다. 어떤 노드를 루트로 쓸지 정하는 것이 씬 설계의 시작점입니다.">
+        <h2>Node2D vs Control 비교</h2>
+        <div class="two-columns">
+          <div>
+            <h3 style="font-size: 1em; color: var(--gd-green);">Node2D 계열</h3>
+            <pre><code class="language-gdscript"># Node2D의 주요 속성
+position   # Vector2 위치
+rotation   # float 회전 (라디안)
+scale      # Vector2 크기
+z_index    # int 렌더링 순서
+visible    # bool 표시 여부
+modulate   # Color 색상 변조</code></pre>
+            <p style="font-size: 0.8em;">게임 오브젝트에 사용: 캐릭터, 적, 아이템, 배경 등</p>
+          </div>
+          <div>
+            <h3 style="font-size: 1em; color: var(--gd-red);">Control 계열</h3>
+            <pre><code class="language-gdscript"># Control의 주요 속성
+anchor_left / anchor_top   # 앵커
+offset_left / offset_top   # 오프셋
+size        # Vector2 크기
+size_flags_horizontal  # 플래그
+custom_minimum_size    # 최소 크기
+theme       # Theme 리소스</code></pre>
+            <p style="font-size: 0.8em;">UI 요소에 사용: 버튼, 라벨, 메뉴, HUD 등</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 6: 씬이란 -->
+      <section data-narration="씬은 노드를 트리 형태로 구성한 하나의 재사용 가능한 단위입니다. 파일 확장자는 점 tscn이며, 플레이어 씬, 적 씬, 레벨 씬, UI 씬 등을 각각 별도 파일로 관리합니다. 씬 안에 다른 씬을 포함할 수 있어서, 작은 씬을 조합해 큰 게임을 만드는 것이 가능합니다.">
+        <h2>씬(Scene)이란?</h2>
+        <div class="key-point">
+          <h3>정의</h3>
+          <p><strong>씬</strong> = 노드 트리를 파일로 저장한 것 (<code>.tscn</code> 형식)<br>
+          재사용 가능한 게임 오브젝트의 설계도(Template)입니다.</p>
+        </div>
+        <div class="two-columns fragment">
+          <div>
+            <h3 style="font-size: 1em;">씬의 예시</h3>
+            <ul style="font-size: 0.85em;">
+              <li><code>player.tscn</code> - 플레이어 캐릭터</li>
+              <li><code>enemy_slime.tscn</code> - 슬라임 적</li>
+              <li><code>level_01.tscn</code> - 1번 레벨</li>
+              <li><code>main_menu.tscn</code> - 메인 메뉴</li>
+              <li><code>hud.tscn</code> - HUD 인터페이스</li>
+            </ul>
+          </div>
+          <div>
+            <h3 style="font-size: 1em;">씬의 특징</h3>
+            <ul style="font-size: 0.85em;">
+              <li class="fragment">씬 안에 다른 씬을 포함 가능</li>
+              <li class="fragment">독립적으로 테스트/실행 가능 (F6)</li>
+              <li class="fragment">하나의 씬 = 하나의 .tscn 파일</li>
+              <li class="fragment">메인 씬 지정: 프로젝트 설정에서</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 7: 씬 저장/불러오기 -->
+      <section data-narration="씬을 저장하면 점 tscn 파일이 생성됩니다. 이 파일은 텍스트 형식이라 Git 같은 버전 관리 도구와 함께 쓰기 좋습니다. 씬을 코드에서 불러올 때는 load 또는 preload 함수를 사용합니다. preload는 컴파일 시점에 미리 로드하므로 더 빠르지만, 경로가 반드시 상수여야 합니다.">
+        <h2>씬 저장과 불러오기</h2>
+        <h3 style="font-size: 1em;">에디터에서 저장</h3>
+        <p style="font-size: 0.85em;"><code>Ctrl+S</code> (씬 저장) / <code>Ctrl+Shift+S</code> (다른 이름으로 저장)</p>
+        <h3 style="font-size: 1em; margin-top: 15px;">코드에서 불러오기</h3>
+        <pre><code class="language-gdscript"># 방법 1: preload - 컴파일 시점에 미리 로드 (권장)
+var bullet_scene = preload("res://scenes/bullet.tscn")
+
+# 방법 2: load - 런타임에 동적 로드
+var level_path = "res://levels/level_" + str(level_num) + ".tscn"
+var level_scene = load(level_path)
+
+# 방법 3: ResourceLoader - 비동기 로드 (대용량)
+ResourceLoader.load_threaded_request("res://scenes/boss.tscn")
+# ... 나중에 결과 확인
+var status = ResourceLoader.load_threaded_get_status("res://scenes/boss.tscn")
+if status == ResourceLoader.THREAD_LOAD_LOADED:
+    var boss_scene = ResourceLoader.load_threaded_get("res://scenes/boss.tscn")</code></pre>
+        <div class="tip fragment">
+          <strong>preload vs load:</strong> 경로가 고정이면 <code>preload</code>, 동적이면 <code>load</code> 사용
+        </div>
+      </section>
+
+      <!-- Slide 8: 인스턴싱 -->
+      <section data-narration="인스턴싱은 씬 파일을 실제 노드 트리로 만드는 과정입니다. PackedScene의 instantiate 메서드를 호출하면 씬의 복사본이 생성됩니다. 생성된 인스턴스를 add_child로 트리에 추가해야 화면에 나타납니다. 이 과정을 통해 같은 씬을 여러 번 복제할 수 있습니다.">
+        <h2>인스턴싱(Instancing)</h2>
+        <div class="key-point">
+          <h3>PackedScene.instantiate()</h3>
+          <p>씬 파일(.tscn)을 실제 노드 트리로 복제하는 과정</p>
+        </div>
+        <pre><code class="language-gdscript"># 1단계: 씬 리소스 로드
+var enemy_scene: PackedScene = preload("res://scenes/enemy.tscn")
+
+# 2단계: 인스턴스 생성 (아직 트리에 없음)
+var enemy = enemy_scene.instantiate()
+
+# 3단계: 속성 설정
+enemy.position = Vector2(400, 300)
+enemy.name = "Slime_01"
+
+# 4단계: 트리에 추가 (이제 화면에 표시됨!)
+add_child(enemy)</code></pre>
+        <div class="two-columns fragment">
+          <div class="tip" style="font-size: 0.8em;">
+            <strong>활용 예:</strong> 총알, 적, 아이템, 파티클 등 동일한 오브젝트를 반복 생성할 때 인스턴싱 사용
+          </div>
+          <div class="warning" style="font-size: 0.8em;">
+            <strong>주의:</strong> instantiate()만으로는 화면에 표시되지 않음. 반드시 add_child() 필요!
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 9: 노드 생명주기 -->
+      <section data-narration="노드에는 엔진이 자동으로 호출하는 콜백 함수들이 있습니다. 언더바 init은 생성 시, 언더바 ready는 트리에 추가된 후, 언더바 process는 매 프레임, 언더바 physics process는 물리 프레임마다, 언더바 exit tree는 트리에서 제거될 때 호출됩니다. 이 생명주기를 이해하면 올바른 위치에 코드를 배치할 수 있습니다.">
+        <h2>노드 생명주기(Lifecycle)</h2>
+        <pre style="background: rgba(71, 140, 191, 0.1); padding: 15px; border-radius: 8px; font-size: 0.7em; text-align: center; color: #e0e0e0;">
+_init()  --&gt;  _enter_tree()  --&gt;  _ready()  --&gt;  _process() / _physics_process()  --&gt;  _exit_tree()
+ 생성           트리 진입          준비 완료        매 프레임 반복 실행                     트리 이탈
+        </pre>
+        <pre><code class="language-gdscript">extends Node2D
+
+func _init():
+    # 노드 객체 생성 시 (생성자)
+    # 아직 트리에 추가되지 않은 상태
+    print("1. 생성됨")
+
+func _enter_tree():
+    # 씬 트리에 추가될 때
+    print("2. 트리 진입")
+
+func _ready():
+    # 자신과 모든 자식 노드가 트리에 들어온 후 (1회만)
+    print("3. 준비 완료!")
+
+func _process(delta: float):
+    # 매 렌더링 프레임마다 (가변 FPS)
+    pass
+
+func _physics_process(delta: float):
+    # 매 물리 프레임마다 (기본 60Hz 고정)
+    pass
+
+func _exit_tree():
+    # 씬 트리에서 제거될 때
+    print("5. 트리 이탈")</code></pre>
+      </section>
+
+      <!-- Slide 10: _ready vs _process 상세 -->
+      <section data-narration="언더바 ready와 언더바 process는 가장 자주 사용하는 콜백입니다. ready는 초기화 코드를 넣는 곳으로, 노드 참조 획득이나 초기 상태 설정에 사용합니다. process는 매 프레임 실행되는 곳으로, 입력 처리나 이동 로직에 사용합니다. delta는 이전 프레임과의 시간 차이로, 프레임률에 독립적인 동작을 보장합니다.">
+        <h2>_ready() vs _process() 비교</h2>
+        <div class="two-columns">
+          <div>
+            <h3 style="font-size: 1em; color: var(--gd-green);">_ready() - 초기화</h3>
+            <pre><code class="language-gdscript">func _ready():
+    # 1회만 호출 (시작 시)
+    # 용도: 초기화, 참조 획득
+
+    # 노드 참조 저장
+    sprite = $Sprite2D
+    anim = $AnimationPlayer
+
+    # 초기 상태 설정
+    health = max_health
+    position = start_pos
+
+    # 시그널 연결
+    $Button.pressed.connect(_on_btn)</code></pre>
+          </div>
+          <div>
+            <h3 style="font-size: 1em; color: var(--gd-blue);">_process(delta) - 매 프레임</h3>
+            <pre><code class="language-gdscript">func _process(delta: float):
+    # 매 프레임 호출 (가변 FPS)
+    # 용도: 입력, 이동, 애니메이션
+
+    # delta = 이전 프레임과의 시간차
+    # 60fps: delta ~ 0.0167
+    # 30fps: delta ~ 0.0333
+
+    # delta를 곱해야 프레임률 독립적!
+    position.x += speed * delta
+
+    # 입력 처리
+    if Input.is_action_pressed("jump"):
+        jump()</code></pre>
+          </div>
+        </div>
+        <div class="warning fragment" style="font-size: 0.85em;">
+          <strong>_physics_process(delta):</strong> 물리 연산(이동, 충돌)은 반드시 _physics_process에서! _process는 렌더링용.
+        </div>
+      </section>
+
+      <!-- Slide 11: get_node와 $ 표기법 -->
+      <section data-narration="다른 노드에 접근할 때 get_node 함수를 사용합니다. 달러 기호는 get_node의 축약형으로, 달러 Sprite2D는 get_node 괄호 Sprite2D와 동일합니다. 경로는 상대 경로와 절대 경로 모두 사용 가능하며, 퍼센트 기호를 사용하면 고유 이름으로 직접 접근할 수도 있습니다.">
+        <h2>노드 접근: get_node()와 $ 표기법</h2>
+        <pre><code class="language-gdscript"># get_node() - 경로로 노드 찾기
+var sprite = get_node("Sprite2D")           # 직접 자식
+var shape = get_node("Sprite2D/CollisionShape2D")  # 손자
+
+# $ 표기법 - get_node의 단축키 (동일한 기능)
+var sprite = $Sprite2D                      # 직접 자식
+var shape = $Sprite2D/CollisionShape2D      # 손자
+
+# 부모/형제 접근
+var parent = get_parent()                   # 부모 노드
+var sibling = get_parent().get_node("Sibling")  # 형제 노드
+var root_node = get_tree().root             # 루트 노드
+
+# % 고유 이름 (Unique Name) - Godot 4의 강력한 기능!
+# 에디터에서 노드 우클릭 > "Access as Unique Name" 체크
+var player = %Player    # 트리 어디서든 접근 가능</code></pre>
+        <div class="two-columns fragment">
+          <div class="tip" style="font-size: 0.8em;">
+            <strong>팁:</strong> <code>%UniqueNode</code>는 씬 내에서 고유 이름을 설정한 노드에 직접 접근합니다. 경로가 바뀌어도 안전합니다.
+          </div>
+          <div class="warning" style="font-size: 0.8em;">
+            <strong>주의:</strong> <code>$</code>와 <code>get_node()</code>는 _ready() 이후에 사용! _init()에서는 아직 트리에 없어서 null 반환.
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 12: 노드 추가/삭제 -->
+      <section data-narration="코드에서 노드를 동적으로 추가하고 제거할 수 있습니다. add_child로 자식을 추가하고, remove_child로 트리에서 분리합니다. queue_free는 현재 프레임이 끝난 후 노드를 안전하게 삭제하는 메서드입니다. 즉시 삭제가 필요한 경우 free를 사용할 수 있지만, 대부분 queue_free가 안전합니다.">
+        <h2>노드 추가/삭제 (동적 관리)</h2>
+        <pre><code class="language-gdscript"># === 노드 추가 ===
+var label = Label.new()          # 코드로 노드 생성
+label.text = "Hello Godot!"
+add_child(label)                 # 자식으로 추가
+
+# 특정 위치에 삽입
+add_child(node)                  # 맨 뒤에 추가
+add_child(node)                  # 기본
+move_child(node, 0)              # 첫 번째 자식으로 이동
+
+# === 노드 제거 ===
+remove_child(label)              # 트리에서 분리 (메모리에 남아있음!)
+label.queue_free()               # 프레임 끝에 안전하게 삭제 (권장)
+label.free()                     # 즉시 삭제 (주의 필요)
+
+# === 실전: 적 스폰 & 제거 ===
+func spawn_enemy():
+    var enemy = enemy_scene.instantiate()
+    enemy.position = Vector2(randf_range(0, 800), 0)
+    add_child(enemy)
+
+func _on_enemy_died(enemy: Node):
+    enemy.queue_free()           # 안전한 삭제</code></pre>
+        <div class="warning fragment">
+          <strong>remove_child vs queue_free:</strong> remove_child()는 트리에서만 제거, 메모리 해제 안 됨! queue_free()가 메모리까지 정리.
+        </div>
+      </section>
+
+      <!-- Slide 13: 부모-자식 관계 -->
+      <section data-narration="부모-자식 관계는 단순한 소유 개념이 아닙니다. 자식의 좌표는 부모 노드를 기준으로 계산되며, 부모가 이동하면 자식도 자동으로 함께 이동합니다. 또한 부모가 삭제되면 모든 자식도 함께 삭제됩니다. 이 중요한 특성을 잘 활용하면 그룹 이동이나 장비 장착 등을 매우 쉽게 구현할 수 있습니다.">
+        <h2>부모-자식 관계의 특성</h2>
+        <table class="compare-table">
+          <thead>
+            <tr>
+              <th>특성</th>
+              <th>설명</th>
+              <th>예시</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="fragment">
+              <td><strong>변환 상속</strong></td>
+              <td>부모 이동/회전/크기 변환이 자식에 전파</td>
+              <td>캐릭터(부모) 이동 시 무기(자식)도 이동</td>
+            </tr>
+            <tr class="fragment">
+              <td><strong>생명 연동</strong></td>
+              <td>부모 삭제 시 자식도 모두 삭제</td>
+              <td>적 삭제 시 HP바, 그림자도 함께 사라짐</td>
+            </tr>
+            <tr class="fragment">
+              <td><strong>처리 순서</strong></td>
+              <td>부모 _process가 자식보다 먼저 호출</td>
+              <td>게임 매니저가 먼저 상태 업데이트</td>
+            </tr>
+            <tr class="fragment">
+              <td><strong>owner 속성</strong></td>
+              <td>씬 파일에 저장될 소유자 노드</td>
+              <td>에디터에서 볼 수 있는 노드 범위 결정</td>
+            </tr>
+          </tbody>
+        </table>
+        <pre class="fragment"><code class="language-gdscript"># 부모-자식 관계 활용
+func equip_weapon(weapon_scene: PackedScene):
+    # 기존 무기 제거
+    if $WeaponSlot.get_child_count() > 0:
+        $WeaponSlot.get_child(0).queue_free()
+    # 새 무기를 자식으로 추가 (부모 따라 이동)
+    var weapon = weapon_scene.instantiate()
+    $WeaponSlot.add_child(weapon)</code></pre>
+      </section>
+
+      <!-- Slide 14: 씬 트리(SceneTree) -->
+      <section data-narration="SceneTree는 모든 노드를 관리하는 Godot의 핵심 객체입니다. get_tree 함수로 접근할 수 있으며, 게임 일시정지, 씬 전환, 그룹 호출 등의 기능을 제공합니다. 씬 트리는 프레임마다 모든 노드를 순회하며 process와 physics_process를 호출합니다.">
+        <h2>씬 트리(SceneTree)</h2>
+        <div class="key-point">
+          <h3>SceneTree의 역할</h3>
+          <p>모든 활성 노드를 관리하고, 게임 루프를 구동하는 최상위 관리자</p>
+        </div>
+        <pre><code class="language-gdscript"># SceneTree 접근
+var tree = get_tree()
+
+# 씬 전환
+get_tree().change_scene_to_file("res://scenes/level_02.tscn")
+get_tree().change_scene_to_packed(preload("res://scenes/level_02.tscn"))
+
+# 게임 일시정지 / 해제
+get_tree().paused = true   # 전체 일시정지
+get_tree().paused = false  # 해제
+
+# 게임 종료
+get_tree().quit()
+
+# 씬 리로드 (재시작)
+get_tree().reload_current_scene()
+
+# 그룹의 모든 노드에 함수 호출
+get_tree().call_group("enemies", "take_damage", 10)
+
+# 현재 씬의 루트 노드
+var current_scene = get_tree().current_scene</code></pre>
+      </section>
+
+      <!-- Slide 15: 노드 경로 -->
+      <section data-narration="노드 경로는 파일 시스템의 경로와 비슷한 문법을 사용합니다. 상대 경로는 현재 노드를 기준으로, 절대 경로는 루트에서 시작합니다. 점 두 개는 부모를 의미합니다. NodePath 타입으로 경로를 미리 변수에 저장해두면 에디터 인스펙터에서 편리하게 드래그 앤 드롭으로 지정할 수 있습니다.">
+        <h2>노드 경로(NodePath)</h2>
+        <pre><code class="language-gdscript"># === 상대 경로 (현재 노드 기준) ===
+$Sprite2D                        # 직접 자식
+$Sprite2D/Light2D                # 자식의 자식
+$"../Sibling"                    # 형제 (부모로 올라간 후)
+$"../../Uncle/Cousin"            # 더 위로
+
+# === 절대 경로 (루트부터) ===
+get_node("/root/Main/Player")    # 루트에서 시작
+
+# === NodePath 타입 활용 ===
+@export var target_path: NodePath  # 에디터에서 드래그로 지정!
+
+func _ready():
+    var target = get_node(target_path)
+    print(target.name)
+
+# === 유용한 노드 탐색 메서드 ===
+get_children()           # 모든 자식 배열
+get_child_count()        # 자식 수
+get_child(0)             # 인덱스로 자식 접근
+find_child("Enemy*")     # 이름 패턴으로 검색
+has_node("Sprite2D")     # 존재 여부 확인</code></pre>
+        <div class="tip fragment">
+          <strong>팁:</strong> <code>@export var target_path: NodePath</code>를 사용하면, 인스펙터에서 노드를 드래그하여 경로를 지정할 수 있습니다.
+        </div>
+      </section>
+
+      <!-- Slide 16: 실전 씬 구성 예제 -->
+      <section data-narration="실전에서 플레이어 씬을 어떻게 구성하는지 예제를 살펴보겠습니다. CharacterBody2D를 루트로, 그 아래에 Sprite2D, CollisionShape2D, AnimationPlayer를 배치합니다. 스크립트에서는 ready에서 초기화하고, physics_process에서 이동 처리를 합니다. 이 패턴은 거의 모든 게임 캐릭터에 적용됩니다.">
+        <h2>실전: 플레이어 씬 구성</h2>
+        <div class="two-columns">
+          <div>
+            <pre><code style="font-size: 0.7em;">## player.tscn 트리 구조 ##
+
+CharacterBody2D (Player)  # 루트
+ +-- Sprite2D             # 캐릭터 그래픽
+ +-- CollisionShape2D     # 충돌 영역
+ +-- AnimationPlayer      # 애니메이션
+ +-- RayCast2D            # 바닥 감지
+ +-- Camera2D             # 카메라 추적
+ +-- HitBox (Area2D)      # 공격 판정
+ |    +-- CollisionShape2D
+ +-- HurtBox (Area2D)     # 피격 판정
+      +-- CollisionShape2D</code></pre>
+          </div>
+          <div>
+            <pre><code class="language-gdscript" style="font-size: 0.7em;"># player.gd
+extends CharacterBody2D
+
+@export var speed := 200.0
+@export var jump_force := -350.0
+var gravity := 980.0
+
+@onready var sprite = $Sprite2D
+@onready var anim = $AnimationPlayer
+
+func _physics_process(delta):
+    # 중력 적용
+    if not is_on_floor():
+        velocity.y += gravity * delta
+
+    # 점프
+    if Input.is_action_just_pressed("jump"):
+        if is_on_floor():
+            velocity.y = jump_force
+
+    # 좌우 이동
+    var dir = Input.get_axis("left", "right")
+    velocity.x = dir * speed
+
+    # 스프라이트 방향
+    if dir != 0:
+        sprite.flip_h = dir < 0
+
+    move_and_slide()</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 17: 정리 -->
+      <section data-narration="이번 챕터에서 배운 핵심 내용을 정리합니다. 노드는 Godot의 기본 빌딩 블록이고, 씬은 노드 트리를 파일로 저장한 것입니다. 인스턴싱으로 씬을 복제하고, 생명주기 콜백으로 노드의 동작을 제어합니다. 달러 기호와 get_node로 다른 노드에 접근하며, add_child와 queue_free로 동적 관리를 합니다.">
+        <h2>Chapter 03 정리</h2>
+        <table class="compare-table">
+          <thead>
+            <tr>
+              <th>개념</th>
+              <th>설명</th>
+              <th>핵심 코드</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>노드</strong></td>
+              <td>게임의 기본 빌딩 블록</td>
+              <td><code>Node, Node2D, Control</code></td>
+            </tr>
+            <tr>
+              <td><strong>씬</strong></td>
+              <td>노드 트리를 파일로 저장</td>
+              <td><code>.tscn 파일</code></td>
+            </tr>
+            <tr>
+              <td><strong>인스턴싱</strong></td>
+              <td>씬을 실제 노드로 복제</td>
+              <td><code>scene.instantiate()</code></td>
+            </tr>
+            <tr>
+              <td><strong>생명주기</strong></td>
+              <td>노드의 생성~소멸 콜백</td>
+              <td><code>_ready(), _process()</code></td>
+            </tr>
+            <tr>
+              <td><strong>노드 접근</strong></td>
+              <td>다른 노드 참조</td>
+              <td><code>$Node, %Unique, get_node()</code></td>
+            </tr>
+            <tr>
+              <td><strong>동적 관리</strong></td>
+              <td>런타임 생성/삭제</td>
+              <td><code>add_child(), queue_free()</code></td>
+            </tr>
+            <tr>
+              <td><strong>씬 트리</strong></td>
+              <td>전체 노드 관리자</td>
+              <td><code>get_tree(), change_scene()</code></td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="key-point fragment">
+          <h3>기억할 것</h3>
+          <p>Godot에서는 <strong>모든 것이 노드</strong>이고, 노드를 모아 <strong>씬</strong>을 만들고, 씬을 조합해 <strong>게임</strong>을 만든다!</p>
+        </div>
+      </section>
+
+      <!-- Slide 18: 다음 챕터 -->
+      <section class="chapter-title" data-transition="zoom" data-narration="챕터 3, 노드와 씬을 마무리합니다. 노드와 씬의 핵심 개념을 확실히 이해하셨다면, 이제 본격적으로 실제 게임을 만들 준비가 되었습니다. 다음 챕터에서는 2D 게임의 기초를 배우며, Sprite2D, 입력 처리, CharacterBody2D를 활용한 캐릭터 이동과 카메라를 직접 구현해 봅니다.">
+        <span class="chapter-number">Next</span>
+        <h1>수고하셨습니다!</h1>
+        <br>
+        <p><a href="04-2d-basics.html" style="color: var(--gd-blue); font-size: 1.2em;">다음 챕터: 2D 게임 기초 &#8594;</a></p>
+        <br>
+        <p><a href="../index.html" style="color: #888; font-size: 0.7em;">&#8592; 목차로 돌아가기</a></p>
+      </section>
+
+    </div>
+  </div>
+
+  <div class="nav-footer">
+    <a href="../index.html" style="color: #888;">Godot 초보부터 고수까지</a> | Chapter 03
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/plugin/highlight/highlight.min.js"></script>
+  <script>
+    Reveal.initialize({
+      hash: true, slideNumber: true, plugins: [RevealHighlight], transition: 'slide',
+      height: 700, center: false, margin: 0.04, minScale: 0.2, maxScale: 1.5,
+      keyboard: { 38: null, 40: null }, mouseWheel: false
+    });
+    document.addEventListener('keydown', function(e) {
+      if (e.keyCode === 38 || e.keyCode === 40) {
+        var slide = Reveal.getCurrentSlide();
+        if (!slide) return;
+        var amount = 80;
+        if (e.keyCode === 38) { slide.scrollTop -= amount; } else { slide.scrollTop += amount; }
+        e.preventDefault(); e.stopPropagation();
+      }
+    }, true);
+  </script>
+  <script src="js/narration.js"></script>
+</body>
+</html>

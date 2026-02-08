@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Godot 초보부터 고수까지 - Godot Engine 4 완전 정복</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --gd-blue: #478CBF;
+      --gd-blue-dark: #34698f;
+      --gd-blue-light: #5ba3d9;
+      --gd-dark: #0d1117;
+      --gd-dark-card: #161b22;
+      --gd-dark-border: #30363d;
+      --gd-accent: #e0e0e0;
+      --gd-green: #4ec9b0;
+      --gd-red: #f44747;
+      --gd-orange: #ce9178;
+      --gd-text: #e6edf3;
+      --gd-text-muted: #8b949e;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Noto Sans KR', sans-serif;
+      background: var(--gd-dark);
+      color: var(--gd-text);
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+
+    /* Hero Section */
+    .hero {
+      text-align: center;
+      padding: 80px 20px 60px;
+      background: linear-gradient(180deg, #0d1117 0%, #11202e 50%, #0d1117 100%);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(ellipse at center, rgba(71, 140, 191, 0.08) 0%, transparent 60%);
+      animation: pulse 8s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 0.5; }
+      50% { transform: scale(1.1); opacity: 1; }
+    }
+
+    .hero-content {
+      position: relative;
+      z-index: 1;
+    }
+
+    .gd-logo {
+      width: 100px;
+      height: 100px;
+      background: var(--gd-blue);
+      color: white;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 38px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 16px;
+      margin: 0 auto 30px;
+      box-shadow: 0 8px 30px rgba(71, 140, 191, 0.4);
+    }
+
+    .hero h1 {
+      font-size: 3.5em;
+      font-weight: 900;
+      background: linear-gradient(135deg, #ffffff 0%, var(--gd-blue-light) 50%, var(--gd-blue) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 12px;
+      letter-spacing: -1px;
+    }
+
+    .hero .subtitle {
+      font-size: 1.4em;
+      color: var(--gd-text-muted);
+      font-weight: 300;
+      margin-bottom: 30px;
+    }
+
+    .hero .stats {
+      display: flex;
+      justify-content: center;
+      gap: 40px;
+      margin-top: 30px;
+    }
+
+    .hero .stat {
+      text-align: center;
+    }
+
+    .hero .stat-number {
+      font-size: 2em;
+      font-weight: 700;
+      color: var(--gd-blue-light);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .hero .stat-label {
+      font-size: 0.85em;
+      color: var(--gd-text-muted);
+    }
+
+    /* Chapters Grid */
+    .chapters-section {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 40px 20px 60px;
+    }
+
+    .section-title {
+      text-align: center;
+      font-size: 1.8em;
+      font-weight: 700;
+      color: var(--gd-text);
+      margin-bottom: 40px;
+    }
+
+    .section-title span {
+      color: var(--gd-blue-light);
+    }
+
+    .chapters-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 20px;
+    }
+
+    .chapter-card {
+      background: var(--gd-dark-card);
+      border: 1px solid var(--gd-dark-border);
+      border-radius: 12px;
+      padding: 28px 24px;
+      text-decoration: none;
+      color: var(--gd-text);
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .chapter-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: var(--gd-blue);
+      transform: scaleX(0);
+      transition: transform 0.3s ease;
+    }
+
+    .chapter-card:hover {
+      border-color: var(--gd-blue);
+      transform: translateY(-4px);
+      box-shadow: 0 12px 40px rgba(71, 140, 191, 0.15);
+    }
+
+    .chapter-card:hover::before {
+      transform: scaleX(1);
+    }
+
+    .chapter-card .chapter-num {
+      display: inline-block;
+      background: var(--gd-blue);
+      color: white;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75em;
+      font-weight: 700;
+      padding: 4px 12px;
+      border-radius: 20px;
+      margin-bottom: 14px;
+    }
+
+    .chapter-card h3 {
+      font-size: 1.2em;
+      font-weight: 700;
+      margin-bottom: 10px;
+      color: var(--gd-text);
+    }
+
+    .chapter-card p {
+      font-size: 0.88em;
+      color: var(--gd-text-muted);
+      line-height: 1.6;
+    }
+
+    .chapter-card .tag-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 14px;
+    }
+
+    .chapter-card .tag {
+      font-size: 0.7em;
+      padding: 3px 10px;
+      border-radius: 12px;
+      background: rgba(71, 140, 191, 0.15);
+      color: var(--gd-blue-light);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Difficulty indicators */
+    .chapter-card .difficulty {
+      display: flex;
+      gap: 3px;
+      margin-top: 12px;
+    }
+
+    .chapter-card .difficulty .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--gd-dark-border);
+    }
+
+    .chapter-card .difficulty .dot.active {
+      background: var(--gd-blue-light);
+    }
+
+    .chapter-card .difficulty .dot.active.medium {
+      background: var(--gd-orange);
+    }
+
+    .chapter-card .difficulty .dot.active.hard {
+      background: var(--gd-red);
+    }
+
+    /* Footer */
+    .footer {
+      background: var(--gd-dark-card);
+      border-top: 1px solid var(--gd-dark-border);
+      padding: 40px 20px;
+      text-align: center;
+    }
+
+    .footer-content {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    .footer h3 {
+      font-size: 1.1em;
+      color: var(--gd-text);
+      margin-bottom: 16px;
+    }
+
+    .footer .command-box {
+      background: #0d1117;
+      border: 1px solid var(--gd-dark-border);
+      border-radius: 8px;
+      padding: 16px 24px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.9em;
+      color: var(--gd-green);
+      margin: 12px 0;
+      display: inline-block;
+      text-align: left;
+    }
+
+    .footer .command-box .prompt {
+      color: var(--gd-text-muted);
+      user-select: none;
+    }
+
+    .footer p {
+      color: var(--gd-text-muted);
+      font-size: 0.85em;
+      margin-top: 16px;
+    }
+
+    .footer .setup-steps {
+      text-align: left;
+      max-width: 600px;
+      margin: 20px auto;
+    }
+
+    .footer .setup-steps li {
+      color: var(--gd-text-muted);
+      font-size: 0.88em;
+      margin-bottom: 8px;
+      list-style: none;
+      padding-left: 24px;
+      position: relative;
+    }
+
+    .footer .setup-steps li::before {
+      content: attr(data-step);
+      position: absolute;
+      left: 0;
+      color: var(--gd-blue-light);
+      font-weight: 700;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .footer .setup-steps code {
+      font-family: 'JetBrains Mono', monospace;
+      background: rgba(71, 140, 191, 0.15);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.9em;
+      color: var(--gd-blue-light);
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .hero h1 { font-size: 2.2em; }
+      .hero .subtitle { font-size: 1.1em; }
+      .hero .stats { gap: 20px; flex-wrap: wrap; }
+      .chapters-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Hero Section -->
+  <header class="hero">
+    <div class="hero-content">
+      <div class="gd-logo">G4</div>
+      <h1>Godot 초보부터 고수까지</h1>
+      <p class="subtitle">Godot Engine 4 + GDScript 완전 정복</p>
+      <div class="stats">
+        <div class="stat">
+          <div class="stat-number">12</div>
+          <div class="stat-label">챕터</div>
+        </div>
+        <div class="stat">
+          <div class="stat-number">220+</div>
+          <div class="stat-label">슬라이드</div>
+        </div>
+        <div class="stat">
+          <div class="stat-number">100+</div>
+          <div class="stat-label">코드 예제</div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Chapters Grid -->
+  <main class="chapters-section">
+    <h2 class="section-title">커리큘럼 <span>Overview</span></h2>
+
+    <div class="chapters-grid">
+
+      <!-- Chapter 1 -->
+      <a href="slides/01-introduction.html" class="chapter-card">
+        <span class="chapter-num">Chapter 01</span>
+        <h3>Godot 엔진 소개</h3>
+        <p>Godot Engine이 무엇인지, 왜 사용하는지 알아보고 에디터 UI와 프로젝트 구조를 학습합니다.</p>
+        <div class="tag-row">
+          <span class="tag">설치</span>
+          <span class="tag">에디터</span>
+          <span class="tag">프로젝트</span>
+        </div>
+        <div class="difficulty">
+          <span class="dot active"></span>
+          <span class="dot"></span>
+          <span class="dot"></span>
+          <span class="dot"></span>
+          <span class="dot"></span>
+        </div>
+      </a>
+
+      <!-- Chapter 2 -->
+      <a href="slides/02-gdscript-basics.html" class="chapter-card">
+        <span class="chapter-num">Chapter 02</span>
+        <h3>GDScript 기초</h3>
+        <p>변수, 자료형, 연산자, 조건문, 반복문, 함수 등 GDScript의 기본 문법을 학습합니다.</p>
+        <div class="tag-row">
+          <span class="tag">변수</span>
+          <span class="tag">함수</span>
+          <span class="tag">조건문</span>
+        </div>
+        <div class="difficulty">
+          <span class="dot active"></span>
+          <span class="dot"></span>
+          <span class="dot"></span>
+          <span class="dot"></span>
+          <span class="dot"></span>
+        </div>
+      </a>
+
+      <!-- Chapter 3 -->
+      <a href="slides/03-nodes-and-scenes.html" class="chapter-card">
+        <span class="chapter-num">Chapter 03</span>
+        <h3>노드와 씬</h3>
+        <p>Godot의 핵심 개념인 노드 트리, 씬 구조, 인스턴싱, 생명주기를 이해합니다.</p>
+        <div class="tag-row">
+          <span class="tag">Node</span>
+          <span class="tag">Scene</span>
+          <span class="tag">lifecycle</span>
+        </div>
+        <div class="difficulty">
+          <span class="dot active"></span>
+          <span class="dot active"></span>
+          <span class="dot"></span>
+          <span class="dot"></span>
+          <span class="dot"></span>
+        </div>
+      </a>
+
+      <!-- Chapter 4 -->
+      <a href="slides/04-2d-basics.html" class="chapter-card">
+        <span class="chapter-num">Chapter 04</span>
+        <h3>2D 게임 기초</h3>
+        <p>Sprite2D, 입력 처리, CharacterBody2D를 활용한 캐릭터 이동과 카메라를 학습합니다.</p>
+        <div class="tag-row">
+          <span class="tag">Sprite2D</span>
+          <span class="tag">Input</span>
+          <span class="tag">CharacterBody2D</span>
+        </div>
+        <div class="difficulty">
+          <span class="dot active"></span>
+          <span class="dot active"></span>
+          <span class="dot"></span>
+          <span class="dot"></span>
+          <span class="dot"></span>
+        </div>
+      </a>
+
+      <!-- Chapter 5 -->
+      <a href="slides/05-physics-collision.html" class="chapter-card">
+        <span class="chapter-num">Chapter 05</span>
+        <h3>물리와 충돌</h3>
+        <p>RigidBody2D, Area2D, CollisionShape2D를 사용한 물리 시뮬레이션과 충돌 처리를 배웁니다.</p>
+        <div class="tag-row">
+          <span class="tag">RigidBody2D</span>
+          <span class="tag">Area2D</span>
+          <span class="tag">Collision</span>
+        </div>
+        <div class="difficulty">
+          <span class="dot active"></span>
+          <span class="dot active"></span>
+          <span class="dot"></span>
+          <span class="dot"></span>
+          <span class="dot"></span>
+        </div>
+      </a>
+
+      <!-- Chapter 6 -->
+      <a href="slides/06-signals-groups.html" class="chapter-card">
+        <span class="chapter-num">Chapter 06</span>
+        <h3>시그널과 그룹</h3>
+        <p>시그널 연결, 커스텀 시그널, 그룹을 활용한 노드 간 통신 패턴을 학습합니다.</p>
+        <div class="tag-row">
+          <span class="tag">signal</span>
+          <span class="tag">emit</span>
+          <span class="tag">group</span>
+        </div>
+        <div class="difficulty">
+          <span class="dot active"></span>
+          <span class="dot active"></span>
+          <span class="dot active medium"></span>
+          <span class="dot"></span>
+          <span class="dot"></span>
+        </div>
+      </a>
+
+      <!-- Chapter 7 -->
+      <a href="slides/07-ui-system.html" class="chapter-card">
+        <span class="chapter-num">Chapter 07</span>
+        <h3>UI 시스템</h3>
+        <p>Control 노드, 컨테이너 레이아웃, 테마 시스템, HUD와 메뉴 구현을 학습합니다.</p>
+        <div class="tag-row">
+          <span class="tag">Control</span>
+          <span class="tag">Container</span>
+          <span class="tag">Theme</span>
+        </div>
+        <div class="difficulty">
+          <span class="dot active"></span>
+          <span class="dot active"></span>
+          <span class="dot active medium"></span>
+          <span class="dot"></span>
+          <span class="dot"></span>
+        </div>
+      </a>
+
+      <!-- Chapter 8 -->
+      <a href="slides/08-animation.html" class="chapter-card">
+        <span class="chapter-num">Chapter 08</span>
+        <h3>애니메이션</h3>
+        <p>AnimationPlayer, AnimatedSprite2D, Tween, 애니메이션 상태 머신을 학습합니다.</p>
+        <div class="tag-row">
+          <span class="tag">AnimationPlayer</span>
+          <span class="tag">Tween</span>
+          <span class="tag">StateMachine</span>
+        </div>
+        <div class="difficulty">
+          <span class="dot active"></span>
+          <span class="dot active"></span>
+          <span class="dot active medium"></span>
+          <span class="dot"></span>
+          <span class="dot"></span>
+        </div>
+      </a>
+
+      <!-- Chapter 9 -->
+      <a href="slides/09-audio-particles.html" class="chapter-card">
+        <span class="chapter-num">Chapter 09</span>
+        <h3>오디오와 파티클</h3>
+        <p>AudioStreamPlayer, AudioBus, GPUParticles2D로 사운드와 시각 효과를 구현합니다.</p>
+        <div class="tag-row">
+          <span class="tag">Audio</span>
+          <span class="tag">AudioBus</span>
+          <span class="tag">Particles</span>
+        </div>
+        <div class="difficulty">
+          <span class="dot active"></span>
+          <span class="dot active"></span>
+          <span class="dot active medium"></span>
+          <span class="dot"></span>
+          <span class="dot"></span>
+        </div>
+      </a>
+
+      <!-- Chapter 10 -->
+      <a href="slides/10-tilemap-levels.html" class="chapter-card">
+        <span class="chapter-num">Chapter 10</span>
+        <h3>타일맵과 레벨</h3>
+        <p>TileMap, TileSet을 활용한 레벨 디자인과 씬 전환 패턴을 학습합니다.</p>
+        <div class="tag-row">
+          <span class="tag">TileMap</span>
+          <span class="tag">TileSet</span>
+          <span class="tag">SceneTree</span>
+        </div>
+        <div class="difficulty">
+          <span class="dot active"></span>
+          <span class="dot active"></span>
+          <span class="dot active medium"></span>
+          <span class="dot"></span>
+          <span class="dot"></span>
+        </div>
+      </a>
+
+      <!-- Chapter 11 -->
+      <a href="slides/11-resources-data.html" class="chapter-card">
+        <span class="chapter-num">Chapter 11</span>
+        <h3>리소스와 데이터</h3>
+        <p>커스텀 Resource, 저장/불러오기, Autoload 싱글톤, 설정 관리를 학습합니다.</p>
+        <div class="tag-row">
+          <span class="tag">Resource</span>
+          <span class="tag">Autoload</span>
+          <span class="tag">Save/Load</span>
+        </div>
+        <div class="difficulty">
+          <span class="dot active"></span>
+          <span class="dot active"></span>
+          <span class="dot active medium"></span>
+          <span class="dot active medium"></span>
+          <span class="dot"></span>
+        </div>
+      </a>
+
+      <!-- Chapter 12 -->
+      <a href="slides/12-project-patterns.html" class="chapter-card">
+        <span class="chapter-num">Chapter 12</span>
+        <h3>실전 프로젝트 패턴</h3>
+        <p>게임 구조 설계, 디자인 패턴, 성능 최적화, 내보내기까지 실전 노하우를 종합합니다.</p>
+        <div class="tag-row">
+          <span class="tag">Architecture</span>
+          <span class="tag">Patterns</span>
+          <span class="tag">Export</span>
+        </div>
+        <div class="difficulty">
+          <span class="dot active"></span>
+          <span class="dot active"></span>
+          <span class="dot active medium"></span>
+          <span class="dot active medium"></span>
+          <span class="dot active hard"></span>
+        </div>
+      </a>
+
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="footer-content">
+      <h3>예제 실행 방법</h3>
+      <ul class="setup-steps">
+        <li data-step="1. ">Godot Engine 4.x를 <a href="https://godotengine.org" style="color: var(--gd-blue-light);">공식 사이트</a>에서 다운로드</li>
+        <li data-step="2. ">새 프로젝트를 생성하고 Node를 추가</li>
+        <li data-step="3. ">예제 <code>.gd</code> 파일의 코드를 스크립트에 붙여넣기</li>
+      </ul>
+      <div class="command-box">
+        <span class="prompt"># </span>예제 파일: examples/01-introduction/01-hello-godot.gd
+      </div>
+      <p>슬라이드는 브라우저에서 HTML 파일을 직접 열거나, Live Server 확장을 사용하세요.</p>
+      <p style="margin-top: 30px; color: #484f58;">Godot 초보부터 고수까지 &copy; 2026</p>
+    </div>
+  </footer>
+
+</body>
+</html>

@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 01: Godot 엔진 소개 - Godot 초보부터 고수까지</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/theme/night.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/plugin/highlight/monokai.min.css">
+  <link rel="stylesheet" href="css/custom.css">
+  <link rel="stylesheet" href="css/narration.css">
+</head>
+<body>
+  <div class="reveal">
+    <div class="slides">
+
+      <!-- Slide 1: Title -->
+      <section class="chapter-title" data-transition="zoom" data-narration="안녕하세요! Godot 엔진 학습 과정에 오신 것을 환영합니다. 이번 챕터에서는 Godot 엔진이 무엇인지, 왜 배워야 하는지, 그리고 에디터의 기본 구조를 함께 살펴보겠습니다. 첫 프로젝트도 직접 만들어 보면서 게임 개발의 첫 걸음을 내딛어 봅시다. 끝까지 집중해 주세요!">
+        <span class="chapter-number">Chapter 01</span>
+        <h1>Godot 엔진 소개</h1>
+        <p class="subtitle">오픈소스 게임 엔진의 세계로 첫 걸음</p>
+        <br>
+        <p><a href="../index.html" style="color: #888; font-size: 0.6em;">&#8592; 목차로 돌아가기</a></p>
+      </section>
+
+      <!-- Slide 2: Godot 소개 -->
+      <section data-narration="Godot 엔진은 아르헨티나 개발자 후안 리니에츠키와 아리엘 만주르가 만든 오픈소스 게임 엔진입니다. 2014년에 처음 공개되었으며, 현재 버전 4는 Vulkan 렌더링을 지원하는 강력한 엔진으로 성장했습니다. MIT 라이선스로 완전히 무료이며, 모든 것은 노드라는 핵심 철학을 가지고 있습니다.">
+        <h2>Godot 엔진이란?</h2>
+        <div class="two-columns">
+          <div>
+            <ul>
+              <li class="fragment"><strong>오픈소스</strong> 크로스 플랫폼 게임 엔진</li>
+              <li class="fragment">2014년 첫 공개 (Juan Linietsky &amp; Ariel Manzur)</li>
+              <li class="fragment">현재 <strong>Godot 4.x</strong> - Vulkan 기반 렌더링</li>
+              <li class="fragment">2D / 3D 게임 모두 지원</li>
+              <li class="fragment">자체 스크립트 언어: <span style="color: var(--gd-blue);">GDScript</span></li>
+            </ul>
+          </div>
+          <div>
+            <div class="key-point">
+              <h3>핵심 철학</h3>
+              <p>&ldquo;모든 것은 노드(Node)다&rdquo; - Godot의 핵심 설계 원칙. 모든 게임 요소가 노드 트리로 구성됩니다.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 3: 오픈소스 & 무료 -->
+      <section data-narration="Godot의 가장 큰 장점 중 하나는 MIT 라이선스입니다. 로열티가 전혀 없고, 상용 게임에도 자유롭게 사용할 수 있습니다. 유니티처럼 수익에 따른 추가 비용이 없어서 인디 개발자에게 특히 매력적입니다. GitHub에서 소스코드를 직접 확인하고 기여할 수도 있어 투명한 개발 과정을 경험할 수 있습니다.">
+        <h2>오픈소스 &amp; 완전 무료</h2>
+        <div class="key-point">
+          <h3>MIT 라이선스</h3>
+          <p>상용/비상용 프로젝트 모두 <strong>무료</strong>. 로열티 없음. 소스코드 수정 가능.</p>
+        </div>
+        <ul>
+          <li class="fragment"><span class="badge badge-green">무료</span> 엔진 다운로드 및 사용</li>
+          <li class="fragment"><span class="badge badge-green">무료</span> 상용 게임 출시 - 로열티 0%</li>
+          <li class="fragment"><span class="badge badge-green">무료</span> 소스코드 열람 및 수정</li>
+          <li class="fragment"><span class="badge badge-blue">커뮤니티</span> 전 세계 기여자들이 함께 개발</li>
+        </ul>
+        <div class="tip fragment">
+          <strong>Tip:</strong> GitHub에서 godotengine/godot 리포지토리를 확인하면 엔진의 전체 소스코드를 볼 수 있습니다. 이슈와 PR로 직접 기여도 가능합니다!
+        </div>
+      </section>
+
+      <!-- Slide 4: 엔진 비교 -->
+      <section data-narration="Godot, Unity, Unreal 세 엔진을 비교해 보겠습니다. Unity는 C샵을 사용하고 에셋스토어가 풍부하지만 라이선스 정책이 변경될 수 있습니다. Unreal은 트리플A급 그래픽에 강하지만 50기가가 넘는 용량이 부담됩니다. Godot은 120메가로 가볍고, 배우기 쉬우며, 특히 2D 게임 개발에서 최고의 성능을 보여줍니다.">
+        <h2>엔진 비교: Godot vs Unity vs Unreal</h2>
+        <table class="compare-table">
+          <thead>
+            <tr>
+              <th>항목</th>
+              <th style="color: var(--gd-blue);">Godot 4</th>
+              <th>Unity</th>
+              <th>Unreal Engine 5</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="fragment">
+              <td><strong>가격</strong></td>
+              <td>완전 무료 (MIT)</td>
+              <td>조건부 무료 / 유료</td>
+              <td>로열티 5% (100만 달러 이후)</td>
+            </tr>
+            <tr class="fragment">
+              <td><strong>언어</strong></td>
+              <td>GDScript, C#, C++</td>
+              <td>C#</td>
+              <td>C++, Blueprint</td>
+            </tr>
+            <tr class="fragment">
+              <td><strong>용량</strong></td>
+              <td>~120MB</td>
+              <td>~2GB+</td>
+              <td>~50GB+</td>
+            </tr>
+            <tr class="fragment">
+              <td><strong>2D 지원</strong></td>
+              <td>전용 2D 엔진 (최고)</td>
+              <td>양호</td>
+              <td>제한적</td>
+            </tr>
+            <tr class="fragment">
+              <td><strong>학습 난이도</strong></td>
+              <td>낮음</td>
+              <td>중간</td>
+              <td>높음</td>
+            </tr>
+            <tr class="fragment">
+              <td><strong>내보내기</strong></td>
+              <td>PC, 모바일, 웹, 콘솔</td>
+              <td>PC, 모바일, 웹, 콘솔</td>
+              <td>PC, 콘솔</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- Slide 5: 설치 -->
+      <section data-narration="Godot 설치는 매우 간단합니다. 공식 웹사이트에서 다운로드하면 별도의 설치 과정 없이 바로 실행할 수 있습니다. 약 120메가바이트의 단일 실행 파일이라 USB에 넣어 다닐 수도 있습니다. 스팀에서도 설치할 수 있으며, Windows, macOS, Linux 모두 지원합니다.">
+        <h2>Godot 4 설치하기</h2>
+        <div class="two-columns">
+          <div>
+            <h3>다운로드 방법</h3>
+            <ol>
+              <li class="fragment"><a href="https://godotengine.org" style="color: var(--gd-blue);">godotengine.org</a> 접속</li>
+              <li class="fragment"><strong>Download Latest</strong> 클릭</li>
+              <li class="fragment">OS에 맞는 버전 선택</li>
+              <li class="fragment">압축 해제 후 바로 실행!</li>
+            </ol>
+            <div class="tip fragment">
+              <strong>Tip:</strong> Steam에서도 &ldquo;Godot Engine&rdquo;을 검색하여 설치할 수 있습니다. 자동 업데이트가 편리합니다.
+            </div>
+          </div>
+          <div>
+            <div class="key-point">
+              <h3>설치 특징</h3>
+              <ul>
+                <li>설치 과정 없음 (포터블)</li>
+                <li>용량 약 120MB</li>
+                <li>단일 실행 파일</li>
+                <li>Windows / macOS / Linux</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 6: 에디터 UI 개요 -->
+      <section data-narration="Godot 에디터를 처음 열면 크게 네 가지 영역이 보입니다. 중앙의 뷰포트, 왼쪽 위의 씬 독, 왼쪽 아래의 파일시스템, 그리고 오른쪽의 인스펙터입니다. 상단에는 2D, 3D, Script, AssetLib 탭이 있고, 하단에는 Output, Debugger, Animation 패널이 위치합니다. 각 영역의 역할을 잘 기억해 두세요.">
+        <h2>에디터 UI 구성</h2>
+        <div class="key-point">
+          <h3>Godot 에디터 4대 영역</h3>
+          <div class="two-columns" style="color: white;">
+            <div>
+              <ul>
+                <li><span class="badge badge-blue">1</span> <strong>뷰포트</strong> - 중앙, 게임 장면 편집</li>
+                <li><span class="badge badge-blue">2</span> <strong>씬 독(Scene Dock)</strong> - 좌상단, 노드 트리</li>
+              </ul>
+            </div>
+            <div>
+              <ul>
+                <li><span class="badge badge-blue">3</span> <strong>파일시스템</strong> - 좌하단, 프로젝트 파일</li>
+                <li><span class="badge badge-blue">4</span> <strong>인스펙터</strong> - 우측, 속성 편집</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+        <div class="fragment">
+          <p>상단 탭: <span class="badge badge-blue">2D</span> <span class="badge badge-blue">3D</span> <span class="badge badge-green">Script</span> <span class="badge badge-orange">AssetLib</span></p>
+          <p>하단 패널: <span class="badge badge-blue">Output</span> <span class="badge badge-blue">Debugger</span> <span class="badge badge-blue">Audio</span> <span class="badge badge-blue">Animation</span></p>
+        </div>
+      </section>
+
+      <!-- Slide 7: 뷰포트 -->
+      <section data-narration="뷰포트는 게임 장면을 시각적으로 편집하는 중앙 영역입니다. 2D 모드에서는 캔버스를, 3D 모드에서는 3차원 공간을 보여줍니다. 마우스 휠로 확대 축소하고, 중앙 버튼 드래그로 화면을 이동할 수 있습니다. W키로 이동 도구, E키로 회전 도구, S키로 크기 조절 도구를 전환하여 오브젝트를 배치합니다.">
+        <h2>뷰포트 (Viewport)</h2>
+        <div class="two-columns">
+          <div>
+            <h3>2D 뷰포트</h3>
+            <ul>
+              <li class="fragment">마우스 휠: 확대/축소</li>
+              <li class="fragment">마우스 중앙 버튼 드래그: 패닝</li>
+              <li class="fragment">상단 도구: 이동(W), 회전(E), 크기(S)</li>
+              <li class="fragment">스냅 설정으로 정밀 배치</li>
+            </ul>
+          </div>
+          <div>
+            <h3>3D 뷰포트</h3>
+            <ul>
+              <li class="fragment">마우스 중앙 버튼: 궤도 회전</li>
+              <li class="fragment">Shift + 중앙 버튼: 패닝</li>
+              <li class="fragment">마우스 휠: 줌</li>
+              <li class="fragment">기즈모로 축별 조작</li>
+            </ul>
+          </div>
+        </div>
+        <div class="tip fragment">
+          <strong>Tip:</strong> F5로 전체 프로젝트 실행, F6으로 현재 씬만 실행합니다. F7은 현재 씬을 정지 없이 다시 실행합니다.
+        </div>
+      </section>
+
+      <!-- Slide 8: 파일시스템 -->
+      <section data-narration="파일시스템 독은 프로젝트의 모든 파일을 관리합니다. Godot은 리소스 경로에 res 프로토콜을 사용합니다. 모든 프로젝트 파일은 프로젝트 루트 폴더 아래에 위치하며, 에디터에서 직접 파일을 생성하고 이동하고 삭제할 수 있습니다. 파일명은 소문자와 언더스코어 조합을 권장하며, 파일 이동은 반드시 에디터 내에서 해야 참조가 깨지지 않습니다.">
+        <h2>파일시스템 (FileSystem)</h2>
+        <ul>
+          <li class="fragment"><strong>res://</strong> - 프로젝트 루트 경로 (리소스 경로)</li>
+          <li class="fragment"><strong>user://</strong> - 사용자 데이터 경로 (세이브 파일 등)</li>
+        </ul>
+        <pre class="fragment"><code class="language-gdscript"># 리소스 경로 예시
+var texture = load("res://sprites/player.png")
+var save_path = "user://save_data.json"</code></pre>
+        <div class="key-point fragment">
+          <h3>파일시스템 규칙</h3>
+          <ul>
+            <li>파일/폴더명은 <strong>소문자와 언더스코어</strong> 권장</li>
+            <li>.import 폴더는 자동 생성 (건드리지 마세요)</li>
+            <li>파일 이동/이름변경은 반드시 <strong>에디터 내에서</strong> 수행</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- Slide 9: 인스펙터 -->
+      <section data-narration="인스펙터는 선택한 노드의 모든 속성을 표시하고 편집할 수 있는 패널입니다. 위치, 크기, 색상 등 다양한 속성을 실시간으로 수정할 수 있으며, 사용자 정의 속성도 export 어노테이션으로 인스펙터에 노출시킬 수 있습니다. 게임 밸런싱 작업을 할 때 코드를 수정하지 않고도 값을 조절할 수 있어 매우 편리합니다.">
+        <h2>인스펙터 (Inspector)</h2>
+        <div class="two-columns">
+          <div>
+            <ul>
+              <li class="fragment">선택한 노드의 <strong>모든 속성</strong> 표시</li>
+              <li class="fragment">실시간 값 수정 가능</li>
+              <li class="fragment">리소스 드래그 앤 드롭</li>
+              <li class="fragment">시그널 연결 관리</li>
+            </ul>
+          </div>
+          <div>
+            <pre><code class="language-gdscript"># @export로 인스펙터에 노출
+@export var speed: float = 200.0
+@export var health: int = 100
+@export var player_name: String = "Hero"
+@export var color: Color = Color.WHITE</code></pre>
+          </div>
+        </div>
+        <div class="tip fragment">
+          <strong>Tip:</strong> @export 어노테이션을 사용하면 코드의 변수를 인스펙터에서 직접 편집할 수 있습니다. 게임 밸런싱에 매우 유용합니다!
+        </div>
+      </section>
+
+      <!-- Slide 10: 노드 시스템 개요 -->
+      <section data-narration="Godot의 핵심 개념인 노드 시스템을 알아봅시다. 노드는 게임을 구성하는 가장 작은 단위입니다. 캐릭터, 카메라, 충돌체, 소리 등 모든 것이 노드입니다. 노드는 트리 구조로 부모-자식 관계를 형성하며, 부모 노드의 변환은 자식 노드에 상속됩니다. Node2D, Node3D, Control 등 용도별로 다양한 노드 타입이 준비되어 있습니다.">
+        <h2>노드 시스템 개요</h2>
+        <div class="key-point">
+          <h3>&ldquo;모든 것은 노드다&rdquo;</h3>
+          <p>게임의 모든 요소(캐릭터, 카메라, 소리, UI 등)는 <strong>노드(Node)</strong>로 표현됩니다.</p>
+        </div>
+        <div class="two-columns fragment">
+          <div>
+            <h3>주요 노드 타입</h3>
+            <ul>
+              <li><span class="badge badge-blue">Node2D</span> 2D 게임 오브젝트</li>
+              <li><span class="badge badge-blue">Node3D</span> 3D 게임 오브젝트</li>
+              <li><span class="badge badge-green">Control</span> UI 요소</li>
+              <li><span class="badge badge-orange">Area2D</span> 감지 영역</li>
+            </ul>
+          </div>
+          <div>
+            <h3>노드 트리 예시</h3>
+            <pre><code class="language-gdscript"># 플레이어 노드 트리
+CharacterBody2D (Player)
+  ├─ Sprite2D
+  ├─ CollisionShape2D
+  ├─ AnimationPlayer
+  └─ Camera2D</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 11: 씬 시스템 개요 -->
+      <section data-narration="씬은 노드들의 트리를 하나의 파일로 저장한 것입니다. 확장자는 .tscn입니다. 씬은 재사용 가능하며, 다른 씬 안에 인스턴스로 포함시킬 수 있습니다. 이것은 객체지향의 상속보다 합성 패턴에 가깝습니다. 예를 들어 플레이어 씬, 총알 씬, 적 씬을 각각 만들고 메인 씬에서 조합하는 방식으로 게임을 구성합니다.">
+        <h2>씬 시스템 개요</h2>
+        <div class="two-columns">
+          <div>
+            <ul>
+              <li class="fragment"><strong>씬(Scene)</strong> = 노드 트리를 파일로 저장 (.tscn)</li>
+              <li class="fragment">씬 안에 다른 씬을 <strong>인스턴스</strong>로 포함 가능</li>
+              <li class="fragment">재사용성과 모듈화의 핵심</li>
+              <li class="fragment">레벨, 캐릭터, UI 등 모두 씬으로 관리</li>
+            </ul>
+          </div>
+          <div>
+            <pre><code class="language-gdscript"># 씬 인스턴스 생성 (코드)
+var bullet_scene = preload(
+    "res://scenes/bullet.tscn"
+)
+var bullet = bullet_scene.instantiate()
+add_child(bullet)</code></pre>
+          </div>
+        </div>
+        <div class="key-point fragment">
+          <h3>합성(Composition) 패턴</h3>
+          <p>Godot은 상속보다 <strong>합성</strong>을 선호합니다. 작은 씬(컴포넌트)을 조합하여 복잡한 게임 오브젝트를 만듭니다.</p>
+        </div>
+      </section>
+
+      <!-- Slide 12: 프로젝트 구조 -->
+      <section data-narration="잘 정리된 프로젝트 구조는 개발 효율을 크게 높입니다. 일반적으로 scenes, scripts, sprites, audio, ui 등의 폴더로 나누어 관리합니다. 팀 프로젝트에서는 특히 일관된 폴더 구조가 중요합니다. .godot 폴더는 엔진이 자동 생성하므로 건드리지 말고, Git 사용 시 .gitignore에 반드시 추가해 주세요.">
+        <h2>권장 프로젝트 구조</h2>
+        <pre><code class="language-gdscript">res://
+├── project.godot          # 프로젝트 설정 파일
+├── scenes/                # 씬 파일 (.tscn)
+│   ├── player/
+│   ├── enemies/
+│   └── levels/
+├── scripts/               # GDScript 파일 (.gd)
+├── sprites/               # 이미지, 스프라이트
+├── audio/                 # 사운드, 음악
+├── ui/                    # UI 관련 씬/리소스
+├── fonts/                 # 폰트 파일
+├── shaders/               # 셰이더 파일
+└── addons/                # 플러그인</code></pre>
+        <div class="warning fragment">
+          <strong>주의:</strong> .godot/ 폴더와 .import/ 폴더는 Godot이 자동 생성합니다. 직접 수정하지 마세요. .gitignore에 .godot/을 추가하세요.
+        </div>
+      </section>
+
+      <!-- Slide 13: project.godot -->
+      <section data-narration="project.godot 파일은 프로젝트의 모든 설정을 담고 있는 핵심 파일입니다. 프로젝트 이름, 메인 씬, 입력 매핑, 렌더링 설정 등이 여기에 저장됩니다. 이 파일이 있는 폴더가 프로젝트의 루트 디렉토리가 됩니다. 텍스트 형식이므로 Git으로 버전 관리가 가능하고, 에디터의 프로젝트 설정 메뉴에서 GUI로 편집할 수 있습니다.">
+        <h2>project.godot 파일</h2>
+        <p>프로젝트의 <strong>핵심 설정 파일</strong> - 이 파일이 있는 폴더가 프로젝트 루트</p>
+        <pre><code class="language-gdscript"># project.godot 주요 설정 항목
+[application]
+config/name="My First Game"
+run/main_scene="res://scenes/main.tscn"
+config/icon="res://icon.svg"
+
+[display]
+window/size/viewport_width=1280
+window/size/viewport_height=720
+
+[input]
+move_left={ "deadzone": 0.5, "events": [...] }
+move_right={ "deadzone": 0.5, "events": [...] }
+
+[rendering]
+renderer/rendering_method="forward_plus"</code></pre>
+        <div class="tip fragment">
+          <strong>Tip:</strong> project.godot는 텍스트 파일이므로 Git으로 버전 관리가 가능합니다. 프로젝트 설정 &rarr; 일반 탭에서 GUI로 편집하세요.
+        </div>
+      </section>
+
+      <!-- Slide 14: 첫 프로젝트 만들기 -->
+      <section data-narration="이제 직접 첫 프로젝트를 만들어 봅시다! 프로젝트 매니저에서 새 프로젝트를 클릭하고, 이름과 경로를 지정한 뒤 렌더러를 선택합니다. 2D 게임이라면 호환성 렌더러를, 3D 게임이라면 Forward 플러스를 선택하세요. 렌더러는 나중에 변경하기 어려우니 프로젝트 시작 시 신중하게 결정하는 것이 좋습니다.">
+        <h2>첫 프로젝트 만들기</h2>
+        <div class="key-point">
+          <h3>프로젝트 생성 단계</h3>
+          <ol>
+            <li class="fragment">Godot 실행 &rarr; <strong>새 프로젝트</strong> 클릭</li>
+            <li class="fragment">프로젝트 이름 입력: <code>MyFirstGame</code></li>
+            <li class="fragment">저장 경로 선택</li>
+            <li class="fragment">렌더러 선택:
+              <ul>
+                <li><span class="badge badge-blue">Forward+</span> 고품질 3D</li>
+                <li><span class="badge badge-green">Mobile</span> 모바일 최적화</li>
+                <li><span class="badge badge-orange">호환성</span> 웹/구형 기기 (2D 추천)</li>
+              </ul>
+            </li>
+            <li class="fragment"><strong>생성 후 편집</strong> 클릭!</li>
+          </ol>
+        </div>
+      </section>
+
+      <!-- Slide 15: GDScript 소개 -->
+      <section data-narration="GDScript는 Godot 전용 스크립트 언어입니다. 파이썬과 매우 비슷한 문법을 가지고 있어 배우기 쉽습니다. 들여쓰기 기반이며, 동적 타이핑과 정적 타이핑을 모두 지원합니다. Godot 엔진의 모든 API와 완벽하게 통합되어 있어서, C샵이나 C++보다 훨씬 간결하게 게임 로직을 작성할 수 있습니다.">
+        <h2>GDScript 소개</h2>
+        <div class="two-columns">
+          <div>
+            <h3>특징</h3>
+            <ul>
+              <li class="fragment"><strong>Python과 유사한</strong> 문법</li>
+              <li class="fragment">들여쓰기(Indentation) 기반</li>
+              <li class="fragment">동적/정적 타이핑 모두 지원</li>
+              <li class="fragment">Godot API와 완벽 통합</li>
+              <li class="fragment">빠른 개발 속도</li>
+            </ul>
+          </div>
+          <div>
+            <pre><code class="language-gdscript"># GDScript 기본 구조
+extends CharacterBody2D
+
+@export var speed: float = 300.0
+
+func _ready():
+    print("게임 시작!")
+
+func _process(delta):
+    var input = Input.get_vector(
+        "left", "right", "up", "down"
+    )
+    velocity = input * speed
+    move_and_slide()</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 16: Hello World -->
+      <section data-narration="첫 번째 스크립트를 작성해 봅시다. Node2D 노드를 만들고 스크립트를 붙입니다. _ready 함수는 노드가 씬에 추가될 때 한 번 실행되고, _process 함수는 매 프레임마다 실행됩니다. 이 두 함수가 가장 기본적인 콜백입니다. _physics_process는 물리 연산에 사용되며, 고정된 시간 간격으로 호출됩니다.">
+        <h2>Hello World 만들기</h2>
+        <p><span class="badge badge-blue">Step 1</span> 루트 노드로 <strong>Node2D</strong> 추가</p>
+        <p><span class="badge badge-blue">Step 2</span> 노드 선택 후 스크립트 붙이기 (Ctrl+Shift+K 또는 아이콘 클릭)</p>
+        <pre><code class="language-gdscript"># my_first_script.gd
+extends Node2D
+
+# 씬에 추가될 때 한 번 실행
+func _ready():
+    print("Hello, Godot!")
+    print("첫 번째 스크립트입니다!")
+
+# 매 프레임마다 실행 (1초에 약 60회)
+func _process(delta: float):
+    # delta = 이전 프레임과의 시간 간격 (초)
+    pass</code></pre>
+        <div class="key-point fragment">
+          <h3>핵심 콜백 함수</h3>
+          <ul>
+            <li><code>_ready()</code> - 노드 초기화 시 1회 호출</li>
+            <li><code>_process(delta)</code> - 매 프레임 호출 (렌더링 속도)</li>
+            <li><code>_physics_process(delta)</code> - 물리 프레임마다 호출 (고정 간격)</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- Slide 17: 정리 -->
+      <section data-narration="이번 챕터에서 배운 내용을 정리해 보겠습니다. Godot은 오픈소스 무료 게임 엔진이고, 노드와 씬이 핵심 개념입니다. 에디터의 네 가지 주요 영역인 뷰포트, 씬 독, 파일시스템, 인스펙터의 역할을 이해했고, GDScript의 첫 맛보기도 해봤습니다. 다음 챕터에서는 GDScript 문법을 본격적으로 학습합니다.">
+        <h2>Chapter 01 정리</h2>
+        <div class="two-columns">
+          <div>
+            <div class="key-point">
+              <h3>핵심 개념</h3>
+              <ul>
+                <li>Godot = <strong>오픈소스 무료</strong> 게임 엔진</li>
+                <li>모든 것은 <strong>노드(Node)</strong></li>
+                <li>노드 트리 = <strong>씬(Scene)</strong></li>
+                <li>씬은 재사용 가능한 <strong>컴포넌트</strong></li>
+              </ul>
+            </div>
+          </div>
+          <div>
+            <div class="key-point">
+              <h3>에디터 구성</h3>
+              <ul>
+                <li><strong>뷰포트</strong> - 장면 편집</li>
+                <li><strong>씬 독</strong> - 노드 트리</li>
+                <li><strong>파일시스템</strong> - 프로젝트 파일</li>
+                <li><strong>인스펙터</strong> - 속성 편집</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+        <div class="tip fragment">
+          <strong>다음 단계:</strong> GDScript의 변수, 자료형, 조건문, 반복문, 함수를 본격적으로 학습합니다!
+        </div>
+      </section>
+
+      <!-- Slide 18: 다음 챕터 -->
+      <section class="chapter-title" data-transition="zoom" data-narration="수고하셨습니다! 첫 번째 챕터를 완료했습니다. Godot 엔진의 전체적인 구조와 개념을 잘 이해하셨을 겁니다. 다음 챕터에서는 GDScript의 기초 문법을 본격적으로 배워보겠습니다. 변수, 자료형, 조건문, 반복문, 함수 등 프로그래밍의 핵심 기본기를 다룹니다. 계속 화이팅하세요!">
+        <span class="chapter-number">Next</span>
+        <h1>수고하셨습니다!</h1>
+        <br>
+        <p><a href="02-gdscript-basics.html" style="color: var(--gd-blue); font-size: 1.2em;">다음 챕터: GDScript 기초 &#8594;</a></p>
+        <br>
+        <p><a href="../index.html" style="color: #888; font-size: 0.7em;">&#8592; 목차로 돌아가기</a></p>
+      </section>
+
+    </div>
+  </div>
+
+  <div class="nav-footer">
+    <a href="../index.html" style="color: #888;">Godot 초보부터 고수까지</a> | Chapter 01
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/plugin/highlight/highlight.min.js"></script>
+  <script>
+    Reveal.initialize({
+      hash: true,
+      slideNumber: true,
+      plugins: [RevealHighlight],
+      transition: 'slide',
+      height: 700,
+      center: false,
+      margin: 0.04,
+      minScale: 0.2,
+      maxScale: 1.5,
+      keyboard: { 38: null, 40: null },
+      mouseWheel: false
+    });
+    document.addEventListener('keydown', function(e) {
+      if (e.keyCode === 38 || e.keyCode === 40) {
+        var slide = Reveal.getCurrentSlide();
+        if (!slide) return;
+        var amount = 80;
+        if (e.keyCode === 38) { slide.scrollTop -= amount; } else { slide.scrollTop += amount; }
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    }, true);
+  </script>
+  <script src="js/narration.js"></script>
+</body>
+</html>

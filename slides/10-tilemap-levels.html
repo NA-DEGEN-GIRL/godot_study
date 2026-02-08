@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 10: 타일맵과 레벨 - Godot 초보부터 고수까지</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/theme/night.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/plugin/highlight/monokai.min.css">
+  <link rel="stylesheet" href="css/custom.css">
+  <link rel="stylesheet" href="css/narration.css">
+</head>
+<body>
+  <div class="reveal">
+    <div class="slides">
+
+      <!-- Slide 1: Title -->
+      <section class="chapter-title" data-transition="zoom" data-narration="챕터 10에 오신 것을 환영합니다. 이번 장에서는 타일맵을 사용하여 게임 레벨을 효율적으로 구성하는 방법을 배웁니다. 타일셋과 아틀라스 생성부터 자동 타일링, 물리 충돌 설정, 코드로 타일 제어하기, 씬 전환과 레벨 관리 패턴, 그리고 패럴랙스 배경과 카메라 제한까지 실전에 필요한 모든 내용을 다룹니다.">
+        <span class="chapter-number">Chapter 10</span>
+        <h1>타일맵과 레벨</h1>
+        <p class="subtitle">TileMap, TileSet, 씬 전환, ParallaxBackground, 레벨 디자인 패턴</p>
+        <br>
+        <p><a href="../index.html" style="color: #888; font-size: 0.6em;">&#8592; 목차로 돌아가기</a></p>
+      </section>
+
+      <!-- Slide 2: TileMap 노드 개요 -->
+      <section data-narration="TileMap은 격자 기반으로 타일을 배치하여 게임 세계를 구성하는 노드입니다. 2D 플랫포머, 탑다운 RPG, 퍼즐 게임 등 대부분의 2D 게임에서 핵심적으로 사용됩니다. Godot 4에서는 TileMap이 크게 개선되어 여러 레이어, 터레인 자동 타일링, 물리 통합 등 강력한 기능을 제공합니다. 하나의 TileMap 노드로 배경부터 충돌 지형까지 모두 처리할 수 있습니다.">
+        <h2>TileMap 노드 개요</h2>
+        <div class="key-point">
+          <h3>TileMap이란?</h3>
+          <p>격자(Grid) 위에 작은 이미지 조각(타일)을 배치하여 게임 맵을 구성하는 노드입니다. 반복적인 지형을 효율적으로 관리하고, 물리 충돌과 내비게이션까지 타일 단위로 설정할 수 있습니다.</p>
+        </div>
+        <div class="two-columns fragment">
+          <div>
+            <h3>주요 특징</h3>
+            <ul>
+              <li>격자 기반 타일 배치</li>
+              <li>다중 레이어 지원</li>
+              <li>타일별 물리/내비게이션 설정</li>
+              <li>자동 타일링 (Terrain)</li>
+              <li>런타임 타일 수정 가능</li>
+            </ul>
+          </div>
+          <div>
+            <h3>노드 구조</h3>
+            <pre><code class="language-gdscript"># TileMap 핵심 속성
+# tile_set: TileSet 리소스
+# layers: 타일 레이어 배열
+# cell_quadrant_size: 렌더링 최적화 단위
+
+# 기본 타일 크기 (TileSet에서 설정)
+# 16x16, 32x32, 64x64 등</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 3: TileSet 만들기 -->
+      <section data-narration="TileSet은 타일맵에서 사용할 타일들의 모음을 정의하는 리소스입니다. 먼저 TileMap 노드를 추가하고 인스펙터에서 새 TileSet을 생성합니다. 하단의 TileSet 패널에서 타일 소스를 추가하는데, 아틀라스 이미지를 드래그하면 자동으로 격자가 나뉩니다. 각 타일에 물리, 내비게이션, 커스텀 데이터를 설정할 수 있습니다.">
+        <h2>TileSet 만들기</h2>
+        <div class="two-columns">
+          <div>
+            <h3>생성 단계</h3>
+            <ol>
+              <li class="fragment">TileMap 노드 추가</li>
+              <li class="fragment">인스펙터 &#8594; Tile Set &#8594; New TileSet</li>
+              <li class="fragment">Tile Size 설정 (예: 16x16)</li>
+              <li class="fragment">하단 TileSet 패널 열기</li>
+              <li class="fragment">+ 버튼 &#8594; Atlas 소스 추가</li>
+              <li class="fragment">타일시트 이미지 드래그</li>
+              <li class="fragment">타일 선택 후 속성 편집</li>
+            </ol>
+          </div>
+          <div>
+            <h3>코드로 TileSet 확인</h3>
+            <pre><code class="language-gdscript">extends TileMap
+
+func _ready():
+    # 현재 TileSet 정보
+    var ts = tile_set
+    print("타일 크기: ", ts.tile_size)
+
+    # 소스 개수
+    var count = ts.get_source_count()
+    print("소스 수: ", count)
+
+    # 첫 번째 소스
+    var source_id = ts.get_source_id(0)
+    var source = ts.get_source(source_id)
+    print("소스 타입: ", source)</code></pre>
+          </div>
+        </div>
+        <div class="tip fragment">
+          <strong>팁:</strong> TileSet 리소스를 별도 <code>.tres</code> 파일로 저장하면 여러 TileMap에서 공유할 수 있습니다. 인스펙터에서 저장 아이콘을 클릭하세요.
+        </div>
+      </section>
+
+      <!-- Slide 4: 타일 아틀라스 -->
+      <section data-narration="타일 아틀라스는 여러 타일을 하나의 이미지에 모아놓은 시트입니다. 하나의 큰 이미지를 사용하면 드로우콜이 줄어 렌더링 성능이 향상됩니다. 아틀라스 소스를 추가하면 Godot가 타일 크기에 맞춰 자동으로 격자를 나눕니다. 여백과 간격이 있는 아틀라스도 Separation과 Margins 설정으로 대응할 수 있습니다.">
+        <h2>타일 아틀라스 (Atlas)</h2>
+        <div class="two-columns">
+          <div>
+            <h3>아틀라스 소스 설정</h3>
+            <ul>
+              <li class="fragment"><strong>Texture</strong>: 타일시트 이미지</li>
+              <li class="fragment"><strong>Tile Size</strong>: 각 타일 크기 (px)</li>
+              <li class="fragment"><strong>Separation</strong>: 타일 간 간격</li>
+              <li class="fragment"><strong>Margins</strong>: 이미지 가장자리 여백</li>
+              <li class="fragment"><strong>Use Texture Padding</strong>: 렌더링 이음새 방지</li>
+            </ul>
+          </div>
+          <div>
+            <h3>멀티 타일 (큰 타일)</h3>
+            <pre><code class="language-gdscript"># 아틀라스에서 여러 셀을 묶어
+# 하나의 큰 타일로 사용 가능
+# 예: 나무(2x3), 건물(3x4)
+
+# TileSet 패널에서:
+# 1. 타일 선택 모드
+# 2. 여러 셀 드래그로 선택
+# 3. 우클릭 -> Create Big Tile
+
+# 코드에서 배치할 때는
+# 왼쪽 상단 좌표만 지정</code></pre>
+          </div>
+        </div>
+        <div class="warning fragment">
+          <strong>주의:</strong> 아틀라스 이미지의 Import 설정에서 <strong>Filter</strong>를 <code>Nearest</code>로 변경하세요. 픽셀 아트에 필터링이 켜지면 타일 이음새에 번짐이 발생합니다.
+        </div>
+      </section>
+
+      <!-- Slide 5: 자동 타일링 (Terrain) -->
+      <section data-narration="Terrain 기능은 인접 타일을 자동으로 판단하여 올바른 타일을 배치하는 자동 타일링 시스템입니다. 벽과 바닥의 모서리, 경계, 연결 부분을 수동으로 배치하면 매우 번거롭지만, Terrain을 설정하면 마우스로 그리기만 해도 적절한 타일이 자동 선택됩니다. 비트마스크 패턴을 올바르게 설정하는 것이 핵심입니다.">
+        <h2>자동 타일링: Terrain</h2>
+        <div class="key-point">
+          <h3>Terrain 시스템이란?</h3>
+          <p>인접한 타일의 종류를 분석하여 올바른 모서리, 경계, 내부 타일을 자동으로 선택하는 기능입니다. 맵 디자인 속도가 비약적으로 향상됩니다.</p>
+        </div>
+        <h3 class="fragment">설정 단계</h3>
+        <ol>
+          <li class="fragment">TileSet &#8594; Terrain Sets &#8594; 새 Terrain Set 추가</li>
+          <li class="fragment">Terrain Set Mode 선택: <code>Match Corners and Sides</code> (가장 일반적)</li>
+          <li class="fragment">Terrain 추가 (예: Ground, Water, Wall)</li>
+          <li class="fragment">TileSet 패널 &#8594; Paint 모드 &#8594; Terrain 선택</li>
+          <li class="fragment">각 타일의 Peering Bits를 칠하기</li>
+          <li class="fragment">TileMap 에디터에서 Terrain 브러시로 그리기</li>
+        </ol>
+        <div class="tip fragment">
+          <strong>팁:</strong> Terrain Mode에는 세 가지가 있습니다. <code>Match Corners and Sides</code>는 47타일, <code>Match Corners</code>는 15타일, <code>Match Sides</code>는 15타일이 필요합니다. 타일시트에 맞는 모드를 선택하세요.
+        </div>
+      </section>
+
+      <!-- Slide 6: 물리 타일 (충돌 설정) -->
+      <section data-narration="타일에 물리 충돌을 설정하면 캐릭터가 지형 위를 걸어다니거나 벽에 부딪힐 수 있습니다. TileSet 패널에서 Physics Layers를 추가하고 각 타일에 충돌 폴리곤을 그립니다. 사각형 타일은 전체를 덮는 기본 사각형을, 경사면 타일은 삼각형 폴리곤을 사용합니다. 플레이어와 적의 충돌 레이어를 다르게 설정할 수도 있습니다.">
+        <h2>물리 타일: 충돌 설정</h2>
+        <div class="two-columns">
+          <div>
+            <h3>Physics Layer 추가</h3>
+            <ol>
+              <li class="fragment">TileSet 인스펙터 &#8594; Physics Layers</li>
+              <li class="fragment">Add Element로 레이어 추가</li>
+              <li class="fragment">Collision Layer / Mask 설정</li>
+              <li class="fragment">TileSet 패널 &#8594; Paint 모드</li>
+              <li class="fragment">Physics Layer 0 선택</li>
+              <li class="fragment">각 타일에 충돌 폴리곤 그리기</li>
+            </ol>
+          </div>
+          <div>
+            <h3>충돌 폴리곤 타입</h3>
+            <pre><code class="language-gdscript"># 타일 충돌은 TileSet 에디터에서
+# 시각적으로 그리는 것이 일반적
+
+# 코드로 타일 충돌 확인하기
+func get_tile_at_position(pos: Vector2):
+    var tile_pos = local_to_map(pos)
+    var data = get_cell_tile_data(
+        0, tile_pos  # layer 0
+    )
+    if data:
+        # 충돌 폴리곤 수 확인
+        var count = data.get_collision_polygons_count(0)
+        print("충돌 폴리곤: ", count)</code></pre>
+          </div>
+        </div>
+        <div class="key-point fragment">
+          <h3>One-way 충돌</h3>
+          <p>플랫포머에서 위로 점프하여 통과하지만 위에서는 착지할 수 있는 플랫폼은 충돌 폴리곤에 <code>One Way</code> 옵션을 활성화하면 됩니다.</p>
+        </div>
+      </section>
+
+      <!-- Slide 7: 타일맵 레이어 -->
+      <section data-narration="타일맵 레이어는 하나의 TileMap 노드 안에서 여러 겹의 타일을 관리하는 기능입니다. 배경 레이어에는 잔디와 흙을, 전경 레이어에는 장식물을, 충돌 레이어에는 물리가 있는 벽 타일을 배치합니다. 각 레이어는 독립적인 Z-index를 가지며, 특정 레이어만 보이거나 숨길 수 있어 편집이 편리합니다.">
+        <h2>타일맵 레이어</h2>
+        <pre><code class="language-gdscript">extends TileMap
+
+# 레이어 상수 정의
+enum TileLayer {
+    BACKGROUND = 0,  # 배경 (잔디, 흙)
+    TERRAIN = 1,     # 지형 (충돌 있는 벽, 바닥)
+    DECORATION = 2,  # 장식 (풀, 꽃, 돌)
+    FOREGROUND = 3   # 전경 (플레이어 앞에 표시)
+}
+
+func _ready():
+    # 레이어별 Z-index 설정 (인스펙터에서도 가능)
+    set_layer_z_index(TileLayer.BACKGROUND, -10)
+    set_layer_z_index(TileLayer.TERRAIN, 0)
+    set_layer_z_index(TileLayer.DECORATION, 5)
+    set_layer_z_index(TileLayer.FOREGROUND, 10)
+
+    # 레이어 활성화/비활성화
+    set_layer_enabled(TileLayer.FOREGROUND, true)
+
+    # 레이어 투명도
+    set_layer_modulate(TileLayer.BACKGROUND, Color(1, 1, 1, 0.7))</code></pre>
+        <div class="tip fragment">
+          <strong>팁:</strong> TileMap 에디터 상단에서 레이어를 전환하며 편집합니다. 눈 아이콘으로 다른 레이어를 숨기면 현재 레이어 편집에 집중할 수 있습니다.
+        </div>
+      </section>
+
+      <!-- Slide 8: 코드로 타일 배치 (set_cell) -->
+      <section data-narration="런타임에 코드로 타일을 배치하면 절차적 맵 생성, 파괴 가능한 지형 등 동적인 레벨을 만들 수 있습니다. set_cell 메서드에 레이어 인덱스, 좌표, 소스 ID, 아틀라스 좌표를 전달합니다. 소스 ID는 TileSet에 추가한 소스의 순서이고, 아틀라스 좌표는 타일시트에서의 위치입니다. 타일을 제거하려면 소스 ID에 마이너스 1을 전달합니다.">
+        <h2>코드로 타일 배치: set_cell</h2>
+        <pre><code class="language-gdscript">extends TileMap
+
+const GROUND_SOURCE = 0       # TileSet의 첫 번째 소스
+const GROUND_ATLAS = Vector2i(0, 0)  # 아틀라스 내 타일 위치
+
+func place_tile(grid_pos: Vector2i, layer: int = 0):
+    # set_cell(layer, coords, source_id, atlas_coords, alternative_tile)
+    set_cell(layer, grid_pos, GROUND_SOURCE, GROUND_ATLAS)
+
+func remove_tile(grid_pos: Vector2i, layer: int = 0):
+    # source_id를 -1로 설정하면 타일 제거
+    set_cell(layer, grid_pos, -1)
+
+func fill_row(y: int, start_x: int, end_x: int):
+    for x in range(start_x, end_x + 1):
+        place_tile(Vector2i(x, y))
+
+func clear_area(rect: Rect2i, layer: int = 0):
+    for x in range(rect.position.x, rect.end.x):
+        for y in range(rect.position.y, rect.end.y):
+            remove_tile(Vector2i(x, y), layer)
+
+# 월드 좌표 -> 타일 좌표 변환
+func world_to_tile(world_pos: Vector2) -> Vector2i:
+    return local_to_map(to_local(world_pos))
+
+# 타일 좌표 -> 월드 좌표 변환
+func tile_to_world(tile_pos: Vector2i) -> Vector2:
+    return to_global(map_to_local(tile_pos))</code></pre>
+        <div class="warning fragment">
+          <strong>주의:</strong> <code>set_cell</code>의 <code>atlas_coords</code>는 픽셀 좌표가 아니라 아틀라스 내 타일 격자 좌표(Vector2i)입니다. 잘못된 좌표를 넣으면 빈 타일이 됩니다.
+        </div>
+      </section>
+
+      <!-- Slide 9: 코드로 타일 읽기 (get_cell_source_id) -->
+      <section data-narration="배치된 타일의 정보를 읽으면 캐릭터가 밟고 있는 타일 종류에 따라 다른 효과를 적용할 수 있습니다. get_cell_source_id로 소스 ID를, get_cell_atlas_coords로 아틀라스 좌표를 확인합니다. 커스텀 데이터 레이어를 활용하면 타일마다 이동 속도 배율, 대미지 등의 추가 정보를 저장하고 읽을 수도 있습니다.">
+        <h2>코드로 타일 읽기</h2>
+        <pre><code class="language-gdscript">extends TileMap
+
+func get_tile_info(grid_pos: Vector2i, layer: int = 0):
+    # 소스 ID (-1이면 빈 셀)
+    var source_id = get_cell_source_id(layer, grid_pos)
+    if source_id == -1:
+        print("빈 타일")
+        return null
+
+    # 아틀라스 좌표
+    var atlas_coords = get_cell_atlas_coords(layer, grid_pos)
+
+    # Alternative 타일 ID
+    var alt_id = get_cell_alternative_tile(layer, grid_pos)
+
+    return {
+        "source": source_id,
+        "atlas": atlas_coords,
+        "alternative": alt_id
+    }
+
+# 커스텀 데이터 활용
+func get_tile_speed_modifier(world_pos: Vector2) -> float:
+    var tile_pos = local_to_map(to_local(world_pos))
+    var data = get_cell_tile_data(0, tile_pos)
+    if data:
+        # TileSet에서 "speed_modifier" 커스텀 데이터 정의 필요
+        return data.get_custom_data("speed_modifier")
+    return 1.0  # 기본 속도
+
+# 특정 타일이 있는 셀 모두 찾기
+func find_all_tiles(layer: int, source: int, atlas: Vector2i) -> Array:
+    var result = []
+    var used = get_used_cells(layer)
+    for cell in used:
+        if get_cell_source_id(layer, cell) == source:
+            if get_cell_atlas_coords(layer, cell) == atlas:
+                result.append(cell)
+    return result</code></pre>
+      </section>
+
+      <!-- Slide 10: 레벨 디자인 팁 -->
+      <section data-narration="효과적인 레벨 디자인을 위한 실전 팁을 알아봅시다. 먼저 블록아웃 단계에서 기본 도형으로 레벨 구조를 잡고, 이후 타일로 디테일을 추가합니다. 레벨 크기와 난이도 곡선을 미리 계획하고, 플레이어의 시선을 유도하는 랜드마크를 배치하세요. 모듈식 타일셋을 설계하면 다양한 레벨을 적은 타일로 만들 수 있습니다.">
+        <h2>레벨 디자인 팁</h2>
+        <div class="two-columns">
+          <div>
+            <h3>디자인 원칙</h3>
+            <ul>
+              <li class="fragment"><strong>블록아웃 먼저</strong>: 단순 도형으로 구조 확인</li>
+              <li class="fragment"><strong>난이도 곡선</strong>: 쉬움 &#8594; 어려움 점진적 상승</li>
+              <li class="fragment"><strong>랜드마크</strong>: 방향 인식을 위한 특징적 요소</li>
+              <li class="fragment"><strong>안전 공간</strong>: 위험 전 휴식 지점 배치</li>
+              <li class="fragment"><strong>가르치는 레벨</strong>: 메커니즘을 안전하게 학습</li>
+            </ul>
+          </div>
+          <div>
+            <h3>기술적 팁</h3>
+            <ul>
+              <li class="fragment">모듈식 타일셋 (재사용 극대화)</li>
+              <li class="fragment">타일 크기 통일 (16, 32, 64px)</li>
+              <li class="fragment">레이어로 깊이감 표현</li>
+              <li class="fragment">장식 타일로 단조로움 방지</li>
+              <li class="fragment">플레이 테스트 반복</li>
+            </ul>
+          </div>
+        </div>
+        <div class="key-point fragment">
+          <h3>황금 규칙</h3>
+          <p>레벨 디자인은 코딩이 아니라 플레이어 경험의 설계입니다. 항상 플레이어의 시점에서 생각하고, 만들고 테스트하고 수정하는 반복 과정이 핵심입니다.</p>
+        </div>
+      </section>
+
+      <!-- Slide 11: 씬 전환 + 전환 애니메이션 -->
+      <section data-narration="게임에서 레벨 간 이동은 씬 전환으로 구현합니다. change_scene_to_file은 파일 경로로, change_scene_to_packed는 미리 로드한 PackedScene을 사용합니다. 씬이 갑자기 바뀌면 부자연스러우므로 Autoload 싱글톤에 페이드 애니메이션을 추가하면 자연스러운 전환을 만들 수 있습니다.">
+        <h2>씬 전환과 전환 애니메이션</h2>
+        <div class="two-columns">
+          <div>
+            <h3>기본 씬 전환</h3>
+            <pre><code class="language-gdscript"># 파일 경로로 전환
+func go_to_level_2():
+    get_tree().change_scene_to_file(
+        "res://levels/level_02.tscn"
+    )
+
+# PackedScene으로 전환 (빠름)
+var level_2 = preload(
+    "res://levels/level_02.tscn"
+)
+func go_packed():
+    get_tree().change_scene_to_packed(
+        level_2
+    )</code></pre>
+          </div>
+          <div>
+            <h3>페이드 전환 (Autoload)</h3>
+            <pre><code class="language-gdscript"># SceneTransition.gd (싱글톤)
+extends CanvasLayer
+
+@onready var anim = $AnimationPlayer
+
+func change_scene(path: String):
+    anim.play("fade_out")
+    await anim.animation_finished
+    get_tree().change_scene_to_file(path)
+    anim.play("fade_in")
+    await anim.animation_finished
+
+# 사용하는 쪽
+func _on_door_entered():
+    SceneTransition.change_scene(
+        "res://levels/level_02.tscn"
+    )</code></pre>
+          </div>
+        </div>
+        <div class="warning fragment">
+          <strong>주의:</strong> 씬 전환 후 현재 씬의 모든 노드가 해제됩니다. 유지해야 할 데이터는 Autoload 싱글톤에 저장하세요. <code>ColorRect</code>의 알파값을 0에서 1로 애니메이션하면 페이드아웃 효과를 만들 수 있습니다.
+        </div>
+      </section>
+
+      <!-- Slide 13: SceneTree 메서드들 -->
+      <section data-narration="SceneTree는 씬 관리 외에도 게임 전체를 제어하는 중요한 메서드들을 제공합니다. paused로 게임을 일시정지하고, reload_current_scene으로 현재 레벨을 재시작합니다. quit으로 게임을 종료하고, create_timer로 지연 실행을 구현합니다. 그룹 관련 메서드로 특정 그룹의 노드를 한 번에 제어할 수도 있습니다.">
+        <h2>SceneTree 주요 메서드</h2>
+        <table class="compare-table">
+          <thead>
+            <tr>
+              <th>메서드 / 속성</th>
+              <th>설명</th>
+              <th>사용 예</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="fragment">
+              <td><code>change_scene_to_file()</code></td>
+              <td>파일 경로로 씬 전환</td>
+              <td>레벨 이동</td>
+            </tr>
+            <tr class="fragment">
+              <td><code>change_scene_to_packed()</code></td>
+              <td>PackedScene으로 전환</td>
+              <td>preload된 씬</td>
+            </tr>
+            <tr class="fragment">
+              <td><code>reload_current_scene()</code></td>
+              <td>현재 씬 재시작</td>
+              <td>게임 오버 재시도</td>
+            </tr>
+            <tr class="fragment">
+              <td><code>paused = true/false</code></td>
+              <td>전체 일시정지</td>
+              <td>ESC 메뉴</td>
+            </tr>
+            <tr class="fragment">
+              <td><code>quit()</code></td>
+              <td>게임 종료</td>
+              <td>종료 버튼</td>
+            </tr>
+            <tr class="fragment">
+              <td><code>create_timer(sec)</code></td>
+              <td>타이머 생성</td>
+              <td>지연 실행</td>
+            </tr>
+          </tbody>
+        </table>
+        <pre class="fragment"><code class="language-gdscript"># 실전 사용 예
+func _on_player_died():
+    await get_tree().create_timer(1.5).timeout
+    get_tree().reload_current_scene()
+
+func _input(event):
+    if event.is_action_pressed("pause"):
+        get_tree().paused = !get_tree().paused</code></pre>
+      </section>
+
+      <!-- Slide 14: 레벨 관리 패턴 -->
+      <section data-narration="여러 레벨을 체계적으로 관리하려면 Autoload 싱글톤에 레벨 관리 로직을 집중하는 패턴이 효과적입니다. 레벨 목록, 현재 레벨 인덱스, 진행 상태를 하나의 매니저에서 관리하면 어디서든 다음 레벨로 이동하거나 특정 레벨을 불러올 수 있습니다. 레벨 데이터를 리소스 파일로 분리하면 확장성이 더 좋아집니다.">
+        <h2>레벨 관리 패턴</h2>
+        <pre><code class="language-gdscript"># LevelManager.gd (Autoload 싱글톤)
+extends Node
+
+var level_data = [
+    {"path": "res://levels/level_01.tscn", "name": "초원",   "unlocked": true},
+    {"path": "res://levels/level_02.tscn", "name": "동굴",   "unlocked": false},
+    {"path": "res://levels/level_03.tscn", "name": "성",     "unlocked": false},
+    {"path": "res://levels/boss.tscn",     "name": "보스전", "unlocked": false},
+]
+var current_level_index: int = 0
+
+func get_current_level() -> Dictionary:
+    return level_data[current_level_index]
+
+func go_to_level(index: int):
+    if index >= 0 and index < level_data.size():
+        current_level_index = index
+        SceneTransition.change_scene(level_data[index].path)
+
+func next_level():
+    var next_idx = current_level_index + 1
+    if next_idx < level_data.size():
+        level_data[next_idx].unlocked = true
+        go_to_level(next_idx)
+
+func restart_level():
+    go_to_level(current_level_index)
+
+func get_unlocked_levels() -> Array:
+    return level_data.filter(func(l): return l.unlocked)</code></pre>
+      </section>
+
+      <!-- Slide 15: Marker2D로 스폰 포인트 -->
+      <section data-narration="Marker2D 노드는 씬에서 특정 위치를 표시하는 데 사용하는 가벼운 노드입니다. 게임에서는 보이지 않지만 에디터에서 십자 아이콘으로 표시됩니다. 플레이어 스폰 위치, 적 출현 지점, 아이템 배치 포인트 등을 마킹하는 데 활용합니다. 그룹과 결합하면 코드에서 모든 스폰 포인트를 쉽게 찾을 수 있습니다.">
+        <h2>Marker2D로 스폰 포인트</h2>
+        <div class="two-columns">
+          <div>
+            <h3>씬 구조</h3>
+            <pre><code class="language-gdscript"># Level01 (Node2D)
+#   ├── TileMap
+#   ├── SpawnPoints
+#   │   ├── PlayerSpawn (Marker2D)
+#   │   ├── EnemySpawn1 (Marker2D)
+#   │   ├── EnemySpawn2 (Marker2D)
+#   │   └── ItemSpawn1 (Marker2D)
+#   └── Player
+
+# Marker2D는 그룹에 추가
+# PlayerSpawn -> "player_spawn"
+# EnemySpawn* -> "enemy_spawns"</code></pre>
+          </div>
+          <div>
+            <h3>코드에서 활용</h3>
+            <pre><code class="language-gdscript">extends Node2D
+
+@onready var player = $Player
+
+func _ready():
+    spawn_player()
+    spawn_enemies()
+
+func spawn_player():
+    var spawn = get_tree() \
+        .get_first_node_in_group(
+            "player_spawn"
+        )
+    if spawn:
+        player.global_position = \
+            spawn.global_position
+
+func spawn_enemies():
+    var spawns = get_tree() \
+        .get_nodes_in_group(
+            "enemy_spawns"
+        )
+    var enemy_scene = preload(
+        "res://scenes/enemy.tscn"
+    )
+    for point in spawns:
+        var e = enemy_scene.instantiate()
+        e.global_position = \
+            point.global_position
+        add_child(e)</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 16: 배경 스크롤 (ParallaxBackground / ParallaxLayer) -->
+      <section data-narration="패럴랙스 배경은 여러 겹의 배경이 서로 다른 속도로 스크롤되어 깊이감을 만드는 기법입니다. ParallaxBackground 노드 안에 ParallaxLayer를 추가하고, 각 레이어의 motion_scale을 조절합니다. 먼 배경은 motion_scale을 작게, 가까운 배경은 크게 설정합니다. Sprite2D나 TextureRect를 레이어에 넣고 mirroring으로 무한 반복을 구현합니다.">
+        <h2>배경 스크롤: ParallaxBackground</h2>
+        <pre><code class="language-gdscript"># 씬 구조
+# ParallaxBackground
+#   ├── Sky (ParallaxLayer)        motion_scale = (0.1, 0.1)
+#   │   └── Sprite2D               (하늘 텍스처)
+#   ├── Mountains (ParallaxLayer)  motion_scale = (0.3, 0.3)
+#   │   └── Sprite2D               (산 텍스처)
+#   ├── Trees (ParallaxLayer)      motion_scale = (0.6, 0.5)
+#   │   └── Sprite2D               (나무 텍스처)
+#   └── Bushes (ParallaxLayer)     motion_scale = (0.9, 0.8)
+#       └── Sprite2D               (관목 텍스처)</code></pre>
+        <div class="two-columns fragment">
+          <div>
+            <h3>주요 속성</h3>
+            <ul>
+              <li><code>motion_scale</code>: 스크롤 속도 비율</li>
+              <li><code>motion_offset</code>: 시작 오프셋</li>
+              <li><code>motion_mirroring</code>: 반복 간격</li>
+            </ul>
+          </div>
+          <div>
+            <h3>무한 스크롤</h3>
+            <pre><code class="language-gdscript"># 이미지 너비만큼 미러링 설정
+# 예: 텍스처 너비가 1024px
+$Sky.motion_mirroring = Vector2(1024, 0)
+$Mountains.motion_mirroring = Vector2(1024, 0)</code></pre>
+          </div>
+        </div>
+        <div class="tip fragment">
+          <strong>팁:</strong> ParallaxBackground는 카메라가 움직이면 자동으로 레이어를 스크롤합니다. Camera2D가 씬에 있어야 제대로 작동합니다.
+        </div>
+      </section>
+
+      <!-- Slide 17: 카메라 제한 (limit) -->
+      <section data-narration="Camera2D의 limit 속성을 설정하면 카메라가 레벨 밖으로 이동하는 것을 방지할 수 있습니다. 상하좌우 네 방향의 한계를 픽셀 단위로 지정합니다. TileMap의 get_used_rect를 활용하면 맵 크기에 맞춰 자동으로 카메라 제한을 설정할 수 있습니다. 스무딩과 드래그 마진을 함께 조절하면 더 자연스러운 카메라 동작이 됩니다.">
+        <h2>카메라 제한 (Camera2D Limit)</h2>
+        <pre><code class="language-gdscript">extends Camera2D
+
+@export var tilemap: TileMap
+
+func _ready():
+    setup_limits()
+
+func setup_limits():
+    if not tilemap:
+        return
+
+    # TileMap의 사용 영역으로 자동 계산
+    var rect = tilemap.get_used_rect()
+    var tile_size = tilemap.tile_set.tile_size
+
+    # 좌상단, 우하단 픽셀 좌표
+    var map_start = rect.position * tile_size
+    var map_end = rect.end * tile_size
+
+    # 카메라 제한 설정
+    limit_left = map_start.x
+    limit_top = map_start.y
+    limit_right = map_end.x
+    limit_bottom = map_end.y
+
+    # 스무딩 설정
+    position_smoothing_enabled = true
+    position_smoothing_speed = 8.0
+
+    # 드래그 마진 (화면 가장자리 근처에서 스크롤 시작)
+    drag_horizontal_enabled = true
+    drag_vertical_enabled = true
+    drag_left_margin = 0.2
+    drag_right_margin = 0.2
+    drag_top_margin = 0.1
+    drag_bottom_margin = 0.3    # 바닥쪽 여유 더 줌</code></pre>
+        <div class="key-point fragment">
+          <h3>limit_smoothed</h3>
+          <p><code>limit_smoothed = true</code>로 설정하면 카메라가 제한에 도달할 때 부드럽게 멈춥니다. 급격한 정지 대신 자연스러운 감속 효과를 줍니다.</p>
+        </div>
+      </section>
+
+      <!-- Slide 18: 정리 -->
+      <section data-narration="챕터 10에서 타일맵과 레벨 구성의 핵심을 모두 다뤘습니다. TileMap과 TileSet으로 효율적인 맵을 만들고, Terrain으로 자동 타일링을 적용하며, 물리 충돌을 설정합니다. 씬 전환과 레벨 관리 패턴으로 여러 레벨을 체계적으로 운영하고, 패럴랙스 배경과 카메라 제한으로 완성도를 높입니다. 다음은 리소스와 데이터 관리입니다.">
+        <h2>Chapter 10 정리</h2>
+        <div class="two-columns">
+          <div>
+            <h3 style="color: var(--gd-blue);">타일맵</h3>
+            <ul>
+              <li><span class="badge badge-blue">TileMap</span> 격자 기반 맵 구성</li>
+              <li><span class="badge badge-blue">TileSet</span> 타일 리소스 관리</li>
+              <li><span class="badge badge-blue">Terrain</span> 자동 타일링</li>
+              <li><span class="badge badge-blue">Physics</span> 타일별 충돌 설정</li>
+              <li><span class="badge badge-blue">Layer</span> 다중 레이어 활용</li>
+              <li><span class="badge badge-blue">set_cell</span> 동적 타일 배치</li>
+            </ul>
+          </div>
+          <div>
+            <h3 style="color: var(--gd-green);">레벨 관리</h3>
+            <ul>
+              <li><span class="badge badge-green">씬 전환</span> file / packed 방식</li>
+              <li><span class="badge badge-green">애니메이션</span> 페이드 인/아웃</li>
+              <li><span class="badge badge-green">SceneTree</span> 재시작, 일시정지</li>
+              <li><span class="badge badge-green">Marker2D</span> 스폰 포인트</li>
+              <li><span class="badge badge-green">Parallax</span> 배경 스크롤</li>
+              <li><span class="badge badge-green">Camera2D</span> 제한과 스무딩</li>
+            </ul>
+          </div>
+        </div>
+        <div class="key-point fragment">
+          <h3>핵심 원칙</h3>
+          <p>좋은 레벨은 기술보다 디자인입니다. 타일맵은 도구일 뿐이고, 중요한 것은 플레이어에게 재미있는 경험을 설계하는 것입니다. 빠르게 만들고, 빠르게 테스트하세요.</p>
+        </div>
+      </section>
+
+      <!-- Slide 19: 다음 챕터 -->
+      <section class="chapter-title" data-transition="zoom" data-narration="챕터 10을 완료하셨습니다. 타일맵과 레벨 구성을 잘 활용하면 다양하고 풍성한 게임 세계를 만들 수 있습니다. 이번에 배운 타일맵, 씬 전환, 패럴랙스 배경, 카메라 제한은 2D 게임 개발의 필수 요소이니 직접 프로젝트에 적용해 보세요. 다음 챕터에서는 리소스와 데이터 관리 방법을 배우며, 게임 구조를 한 단계 더 탄탄하게 만들어 보겠습니다.">
+        <span class="chapter-number">Next</span>
+        <h1>수고하셨습니다!</h1>
+        <br>
+        <p><a href="11-resources-data.html" style="color: var(--gd-blue); font-size: 1.2em;">다음 챕터: 리소스와 데이터 &#8594;</a></p>
+        <br>
+        <p><a href="../index.html" style="color: #888; font-size: 0.7em;">&#8592; 목차로 돌아가기</a></p>
+      </section>
+
+    </div>
+  </div>
+  <div class="nav-footer"><a href="../index.html" style="color: #888;">Godot 초보부터 고수까지</a> | Chapter 10</div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/plugin/highlight/highlight.min.js"></script>
+  <script>
+    Reveal.initialize({ hash: true, slideNumber: true, plugins: [RevealHighlight], transition: 'slide', height: 700, center: false, margin: 0.04, minScale: 0.2, maxScale: 1.5, keyboard: { 38: null, 40: null }, mouseWheel: false });
+    document.addEventListener('keydown', function(e) { if (e.keyCode === 38 || e.keyCode === 40) { var slide = Reveal.getCurrentSlide(); if (!slide) return; var amount = 80; if (e.keyCode === 38) { slide.scrollTop -= amount; } else { slide.scrollTop += amount; } e.preventDefault(); e.stopPropagation(); } }, true);
+  </script>
+  <script src="js/narration.js"></script>
+</body>
+</html>

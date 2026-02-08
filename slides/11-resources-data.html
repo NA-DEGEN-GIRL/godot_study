@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 11: 리소스와 데이터 - Godot 초보부터 고수까지</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/theme/night.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/plugin/highlight/monokai.min.css">
+  <link rel="stylesheet" href="css/custom.css">
+  <link rel="stylesheet" href="css/narration.css">
+</head>
+<body>
+  <div class="reveal">
+    <div class="slides">
+
+      <!-- Slide 1: Title -->
+      <section class="chapter-title" data-transition="zoom" data-narration="챕터 11에 오신 것을 환영합니다. 이번 챕터에서는 Godot의 리소스 시스템과 데이터 관리를 학습합니다. 커스텀 리소스 만들기, 파일 저장과 불러오기, JSON과 ConfigFile 활용, 세이브 시스템 구현, 그리고 Autoload 싱글톤 패턴까지 게임 데이터를 효과적으로 관리하는 모든 기법을 다룹니다.">
+        <span class="chapter-number">Chapter 11</span>
+        <h1>리소스와 데이터</h1>
+        <p class="subtitle">Resource, Save/Load, Autoload, 설정 관리</p>
+        <br>
+        <p><a href="../index.html" style="color: #888; font-size: 0.6em;">&#8592; 목차로 돌아가기</a></p>
+      </section>
+
+      <!-- Slide 2: Resource 클래스 이해 -->
+      <section data-narration="Godot에서 Resource는 데이터를 담는 컨테이너 역할을 합니다. 텍스처, 사운드, 셰이더뿐 아니라 여러분이 직접 만드는 커스텀 데이터도 리소스로 관리할 수 있습니다. 리소스는 파일로 저장되고, 여러 노드에서 공유할 수 있으며, 에디터의 인스펙터에서 바로 편집할 수 있다는 것이 가장 큰 장점입니다.">
+        <h2>Resource 클래스 이해</h2>
+        <div class="key-point">
+          <h3>Resource란?</h3>
+          <p>Godot에서 <strong>데이터를 저장하고 공유</strong>하는 기본 단위입니다.<br>
+          노드(Node)가 행동을 담당한다면, 리소스(Resource)는 <strong>데이터</strong>를 담당합니다.</p>
+        </div>
+        <div class="two-columns">
+          <div>
+            <h3>내장 리소스 예시</h3>
+            <ul>
+              <li class="fragment"><span class="badge badge-blue">Texture2D</span> 이미지 데이터</li>
+              <li class="fragment"><span class="badge badge-green">AudioStream</span> 사운드 데이터</li>
+              <li class="fragment"><span class="badge badge-orange">PackedScene</span> 씬 파일</li>
+              <li class="fragment"><span class="badge badge-red">Shader</span> 셰이더 코드</li>
+              <li class="fragment"><span class="badge badge-blue">Theme</span> UI 테마</li>
+            </ul>
+          </div>
+          <div>
+            <h3>Resource의 특징</h3>
+            <ul>
+              <li class="fragment">파일로 저장 가능 (<code>.tres</code>, <code>.res</code>)</li>
+              <li class="fragment">여러 노드에서 <strong>공유</strong> 가능</li>
+              <li class="fragment">에디터 인스펙터에서 편집</li>
+              <li class="fragment">참조 카운팅으로 메모리 관리</li>
+            </ul>
+          </div>
+        </div>
+        <div class="tip">
+          <strong>Tip:</strong> <code>.tres</code>는 텍스트 형식(사람이 읽을 수 있음), <code>.res</code>는 바이너리 형식(더 빠르고 작음)입니다.
+        </div>
+      </section>
+
+      <!-- Slide 3: 커스텀 Resource 만들기 -->
+      <section data-narration="커스텀 리소스를 만들면 게임의 아이템, 캐릭터 스탯, 스킬 데이터 등을 체계적으로 관리할 수 있습니다. class_name 키워드로 전역 클래스를 등록하면 에디터 어디서든 해당 리소스를 생성하고 편집할 수 있습니다. export 어노테이션을 사용해 인스펙터에서 편집 가능한 속성을 정의하는 것이 핵심입니다.">
+        <h2>커스텀 Resource 만들기</h2>
+        <p><span class="badge badge-blue">class_name</span>으로 전역 등록하면 에디터에서 바로 사용 가능</p>
+        <pre><code class="language-gdscript"># item_data.gd - 아이템 데이터 리소스
+class_name ItemData
+extends Resource
+
+@export var item_name: String = ""
+@export var description: String = ""
+@export var icon: Texture2D
+@export var price: int = 0
+@export_enum("Weapon", "Armor", "Potion", "Material") var category: String
+@export_range(1, 99) var stack_limit: int = 1
+@export var is_consumable: bool = false
+
+# 리소스 내부에도 메서드 정의 가능
+func get_display_name() -&gt; String:
+    return "[%s] %s" % [category, item_name]
+
+func can_stack() -&gt; bool:
+    return stack_limit &gt; 1</code></pre>
+        <div class="tip">
+          <strong>Tip:</strong> 리소스 파일을 만들려면 에디터에서 <code>새 리소스 &gt; ItemData</code>를 선택하거나, 코드에서 <code>ItemData.new()</code>로 생성합니다.
+        </div>
+      </section>
+
+      <!-- Slide 4: @export 변수 심화 -->
+      <section data-narration="export 어노테이션은 인스펙터에서 값을 편집할 수 있게 해주는 강력한 기능입니다. 단순한 타입 지정부터 범위 제한, 열거형, 파일 경로 필터, 그룹화까지 다양한 옵션을 제공합니다. 리소스에서 다른 리소스를 참조할 수도 있어서 복잡한 데이터 구조를 에디터에서 시각적으로 구성할 수 있습니다.">
+        <h2>@export 변수 심화</h2>
+        <p>인스펙터에서 편집 가능한 다양한 속성 타입</p>
+        <pre><code class="language-gdscript"># character_stats.gd
+class_name CharacterStats
+extends Resource
+
+# 기본 타입
+@export var character_name: String = "용사"
+@export var level: int = 1
+
+# 범위 제한
+@export_range(0, 999, 1) var hp: int = 100
+@export_range(0.0, 100.0, 0.1) var speed: float = 5.0
+
+# 열거형
+@export_enum("전사", "마법사", "궁수", "도적") var job_class: String
+
+# 리소스 참조 (다른 리소스를 포함)
+@export var weapon: ItemData
+@export var inventory: Array[ItemData] = []
+
+# 그룹화
+@export_group("전투 스탯")
+@export var attack: int = 10
+@export var defense: int = 5
+@export var magic: int = 3
+
+@export_group("저항력")
+@export_range(0.0, 1.0) var fire_resist: float = 0.0
+@export_range(0.0, 1.0) var ice_resist: float = 0.0
+
+# 파일 경로
+@export_file("*.png") var portrait_path: String
+@export_dir var data_folder: String</code></pre>
+      </section>
+
+      <!-- Slide 5: ResourceLoader / ResourceSaver -->
+      <section data-narration="ResourceLoader와 ResourceSaver는 리소스를 코드에서 불러오고 저장하는 클래스입니다. load 함수는 경로로부터 리소스를 동기적으로 불러오고, ResourceSaver.save를 사용하면 리소스를 파일로 저장할 수 있습니다. 대용량 리소스는 ResourceLoader.load_threaded 시리즈로 백그라운드 로딩을 할 수도 있습니다.">
+        <h2>ResourceLoader / ResourceSaver</h2>
+        <div class="two-columns">
+          <div>
+            <h3 style="color: var(--gd-green);">불러오기 (Load)</h3>
+            <pre><code class="language-gdscript"># 기본 리소스 로드
+var item = load("res://data/sword.tres")
+
+# 타입 캐스팅
+var stats: CharacterStats
+stats = load("res://data/hero.tres")
+
+# ResourceLoader 직접 사용
+var tex = ResourceLoader.load(
+    "res://sprites/hero.png"
+)
+
+# 백그라운드 로딩 (비동기)
+ResourceLoader.load_threaded_request(
+    "res://levels/big_level.tscn"
+)
+# 나중에 결과 확인
+var status = ResourceLoader.load_threaded_get_status(
+    "res://levels/big_level.tscn"
+)
+if status == ResourceLoader.THREAD_LOAD_LOADED:
+    var scene = ResourceLoader.load_threaded_get(
+        "res://levels/big_level.tscn"
+    )</code></pre>
+          </div>
+          <div>
+            <h3 style="color: var(--gd-blue);">저장하기 (Save)</h3>
+            <pre><code class="language-gdscript"># 리소스 생성 후 저장
+var new_item = ItemData.new()
+new_item.item_name = "불의 검"
+new_item.price = 500
+new_item.category = "Weapon"
+
+# .tres (텍스트 형식) 저장
+ResourceSaver.save(
+    new_item,
+    "res://data/fire_sword.tres"
+)
+
+# .res (바이너리 형식) 저장
+ResourceSaver.save(
+    new_item,
+    "res://data/fire_sword.res"
+)</code></pre>
+            <div class="warning">
+              <strong>주의:</strong> <code>res://</code> 경로는 내보내기 후 읽기 전용입니다. 사용자 데이터는 반드시 <code>user://</code> 경로를 사용하세요.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 6: preload vs load -->
+      <section data-narration="preload와 load는 모두 리소스를 불러오는 함수이지만 동작 시점이 다릅니다. preload는 스크립트가 로드되는 시점에 미리 불러오고, load는 해당 코드가 실행되는 시점에 불러옵니다. 자주 사용하는 작은 리소스는 preload로, 조건에 따라 달라지는 대용량 리소스는 load로 불러오는 것이 좋습니다.">
+        <h2>preload vs load</h2>
+        <table class="compare-table">
+          <tr>
+            <th>구분</th>
+            <th>preload()</th>
+            <th>load()</th>
+          </tr>
+          <tr>
+            <td><strong>로드 시점</strong></td>
+            <td>스크립트 로드 시 (컴파일 타임)</td>
+            <td>코드 실행 시 (런타임)</td>
+          </tr>
+          <tr>
+            <td><strong>경로</strong></td>
+            <td>상수 문자열만 가능</td>
+            <td>변수 경로 가능</td>
+          </tr>
+          <tr>
+            <td><strong>성능</strong></td>
+            <td>게임 시작 시 한번에 로드</td>
+            <td>호출 시마다 로드 (캐싱됨)</td>
+          </tr>
+          <tr>
+            <td><strong>용도</strong></td>
+            <td>자주 쓰는 작은 리소스</td>
+            <td>동적/대용량 리소스</td>
+          </tr>
+        </table>
+        <pre><code class="language-gdscript"># preload - 경로가 상수여야 함 (추천: 작은 리소스)
+const BULLET_SCENE = preload("res://scenes/bullet.tscn")
+const HIT_SOUND = preload("res://audio/hit.wav")
+const HERO_STATS = preload("res://data/hero_stats.tres")
+
+func shoot():
+    var bullet = BULLET_SCENE.instantiate()
+    add_child(bullet)
+
+# load - 동적 경로 가능 (추천: 조건부 로딩)
+func load_level(level_num: int):
+    var path = "res://levels/level_%d.tscn" % level_num
+    var scene = load(path)  # 런타임에 경로 결정
+    get_tree().change_scene_to_packed(scene)
+
+# 대용량 리소스: 백그라운드 로딩
+func load_world_async(world_name: String):
+    var path = "res://worlds/%s.tscn" % world_name
+    ResourceLoader.load_threaded_request(path)</code></pre>
+      </section>
+
+      <!-- Slide 7: FileAccess로 파일 저장 -->
+      <section data-narration="FileAccess 클래스를 사용하면 텍스트 파일이나 바이너리 파일을 직접 읽고 쓸 수 있습니다. 리소스 시스템과 별도로 원하는 형식의 데이터를 자유롭게 저장하고 불러올 수 있어 세이브 데이터, 로그 파일, 설정 파일 등을 만들 때 유용합니다. 파일을 열 때는 반드시 null 체크를 해서 에러를 처리해야 합니다.">
+        <h2>FileAccess로 파일 저장</h2>
+        <p>텍스트/바이너리 파일을 직접 읽고 쓰기</p>
+        <div class="two-columns">
+          <div>
+            <h3 style="color: var(--gd-green);">텍스트 파일</h3>
+            <pre><code class="language-gdscript"># 텍스트 파일 쓰기
+func save_text_file():
+    var file = FileAccess.open(
+        "user://log.txt",
+        FileAccess.WRITE
+    )
+    if file == null:
+        print("파일 열기 실패: ",
+            FileAccess.get_open_error())
+        return
+
+    file.store_line("=== 게임 로그 ===")
+    file.store_line("점수: %d" % score)
+    file.store_line("시간: %s" % Time.get_datetime_string_from_system())
+    file.close()
+
+# 텍스트 파일 읽기
+func load_text_file():
+    var file = FileAccess.open(
+        "user://log.txt",
+        FileAccess.READ
+    )
+    if file == null:
+        return
+
+    while not file.eof_reached():
+        var line = file.get_line()
+        print(line)
+    file.close()</code></pre>
+          </div>
+          <div>
+            <h3 style="color: var(--gd-blue);">바이너리 파일</h3>
+            <pre><code class="language-gdscript"># 바이너리 파일 쓰기
+func save_binary():
+    var file = FileAccess.open(
+        "user://save.dat",
+        FileAccess.WRITE
+    )
+    if file == null:
+        return
+
+    file.store_32(player_hp)
+    file.store_32(player_gold)
+    file.store_float(player_x)
+    file.store_float(player_y)
+    file.store_pascal_string(player_name)
+    file.close()
+
+# 바이너리 파일 읽기
+func load_binary():
+    var file = FileAccess.open(
+        "user://save.dat",
+        FileAccess.READ
+    )
+    if file == null:
+        return
+
+    player_hp = file.get_32()
+    player_gold = file.get_32()
+    player_x = file.get_float()
+    player_y = file.get_float()
+    player_name = file.get_pascal_string()
+    file.close()</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 8: JSON 저장/불러오기 -->
+      <section data-narration="JSON은 사람이 읽을 수 있는 범용 데이터 형식으로 세이브 파일이나 설정 파일에 널리 사용됩니다. Godot의 JSON 클래스를 사용하면 딕셔너리를 JSON 문자열로 변환하거나 그 반대로 쉽게 처리할 수 있습니다. 저장할 때는 stringify로 변환하고, 불러올 때는 parse로 파싱하면 됩니다.">
+        <h2>JSON 저장/불러오기</h2>
+        <p>범용적이고 사람이 읽을 수 있는 데이터 형식</p>
+        <pre><code class="language-gdscript"># JSON으로 게임 데이터 저장
+func save_game_json():
+    var save_data = {
+        "player": {
+            "name": player_name,
+            "level": player_level,
+            "hp": current_hp,
+            "position": {"x": position.x, "y": position.y}
+        },
+        "inventory": [],
+        "quests": completed_quests,
+        "play_time": play_time,
+        "save_date": Time.get_datetime_string_from_system()
+    }
+    # 인벤토리 아이템 변환
+    for item in inventory:
+        save_data["inventory"].append({
+            "id": item.id, "count": item.count
+        })
+
+    var json_string = JSON.stringify(save_data, "\t")  # 보기 좋게 들여쓰기
+    var file = FileAccess.open("user://savegame.json", FileAccess.WRITE)
+    file.store_string(json_string)
+    file.close()
+
+# JSON에서 게임 데이터 불러오기
+func load_game_json() -&gt; bool:
+    if not FileAccess.file_exists("user://savegame.json"):
+        print("세이브 파일이 없습니다.")
+        return false
+
+    var file = FileAccess.open("user://savegame.json", FileAccess.READ)
+    var json_string = file.get_as_text()
+    file.close()
+
+    var json = JSON.new()
+    var error = json.parse(json_string)
+    if error != OK:
+        print("JSON 파싱 에러: ", json.get_error_message())
+        return false
+
+    var data = json.data
+    player_name = data["player"]["name"]
+    player_level = data["player"]["level"]
+    current_hp = data["player"]["hp"]
+    position = Vector2(data["player"]["position"]["x"],
+                       data["player"]["position"]["y"])
+    return true</code></pre>
+      </section>
+
+      <!-- Slide 9: ConfigFile 사용 -->
+      <section data-narration="ConfigFile은 INI 파일 형식으로 설정 데이터를 관리하는 전용 클래스입니다. 섹션과 키 값 쌍으로 데이터를 저장하기 때문에 게임 설정, 키 바인딩, 접근성 옵션 등을 관리하기에 매우 적합합니다. JSON보다 구조가 단순하고 직관적이어서 설정 파일 용도로 가독성이 뛰어납니다.">
+        <h2>ConfigFile 사용</h2>
+        <p><span class="badge badge-green">INI 형식</span> 설정 파일 - 섹션과 키-값 쌍으로 관리</p>
+        <div class="two-columns">
+          <div>
+            <h3>저장 / 불러오기</h3>
+            <pre><code class="language-gdscript"># 설정 저장
+func save_settings():
+    var config = ConfigFile.new()
+
+    # [audio] 섹션
+    config.set_value("audio", "master_vol", 0.8)
+    config.set_value("audio", "bgm_vol", 0.6)
+    config.set_value("audio", "sfx_vol", 1.0)
+
+    # [video] 섹션
+    config.set_value("video", "fullscreen", true)
+    config.set_value("video", "vsync", true)
+    config.set_value("video", "resolution", "1920x1080")
+
+    # [controls] 섹션
+    config.set_value("controls", "jump", "space")
+    config.set_value("controls", "attack", "z")
+
+    config.save("user://settings.cfg")
+
+# 설정 불러오기
+func load_settings():
+    var config = ConfigFile.new()
+    var err = config.load("user://settings.cfg")
+    if err != OK:
+        return  # 파일 없으면 기본값 사용
+
+    var master = config.get_value(
+        "audio", "master_vol", 1.0  # 기본값
+    )
+    var fullscreen = config.get_value(
+        "video", "fullscreen", false
+    )</code></pre>
+          </div>
+          <div>
+            <h3>저장된 파일 내용</h3>
+            <pre><code class="language-gdscript"># settings.cfg 파일 내용:
+# [audio]
+# master_vol=0.8
+# bgm_vol=0.6
+# sfx_vol=1.0
+#
+# [video]
+# fullscreen=true
+# vsync=true
+# resolution="1920x1080"
+#
+# [controls]
+# jump="space"
+# attack="z"</code></pre>
+            <div class="key-point">
+              <h3>ConfigFile vs JSON</h3>
+              <ul>
+                <li><strong>ConfigFile:</strong> 설정, 옵션 등 단순 데이터</li>
+                <li><strong>JSON:</strong> 복잡한 중첩 데이터, 세이브 등</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 10: 세이브 시스템 구현 -->
+      <section data-narration="실전 세이브 시스템은 여러 노드의 데이터를 수집해서 하나의 파일로 저장하고, 불러올 때 다시 복원하는 구조입니다. Godot에서는 persist 그룹에 속한 노드들의 데이터를 모아서 저장하는 패턴이 공식 문서에서도 권장됩니다. 각 노드에 save와 load 메서드를 구현하면 어떤 데이터든 저장할 수 있습니다.">
+        <h2>세이브 시스템 구현</h2>
+        <p><span class="badge badge-orange">persist 그룹</span> 패턴으로 여러 노드 데이터를 일괄 저장</p>
+        <pre><code class="language-gdscript"># save_manager.gd - 세이브 매니저
+extends Node
+
+const SAVE_PATH = "user://savegame.json"
+
+# 저장: persist 그룹의 모든 노드 데이터 수집
+func save_game():
+    var save_data = []
+    var save_nodes = get_tree().get_nodes_in_group("persist")
+
+    for node in save_nodes:
+        if not node.has_method("save"):
+            continue
+        var node_data = node.call("save")
+        node_data["_node_path"] = node.get_path()
+        node_data["_scene_path"] = node.scene_file_path
+        save_data.append(node_data)
+
+    var file = FileAccess.open(SAVE_PATH, FileAccess.WRITE)
+    file.store_string(JSON.stringify(save_data, "\t"))
+    file.close()
+    print("게임 저장 완료!")
+
+# 불러오기: 저장된 노드를 복원
+func load_game():
+    if not FileAccess.file_exists(SAVE_PATH):
+        return false
+
+    # 기존 persist 노드 제거
+    for node in get_tree().get_nodes_in_group("persist"):
+        node.queue_free()
+
+    var file = FileAccess.open(SAVE_PATH, FileAccess.READ)
+    var json = JSON.new()
+    json.parse(file.get_as_text())
+    file.close()
+
+    for node_data in json.data:
+        var scene = load(node_data["_scene_path"])
+        var node = scene.instantiate()
+        get_node(node_data["_node_path"]).replace_by(node)
+        if node.has_method("load_data"):
+            node.call("load_data", node_data)
+    return true</code></pre>
+        <pre><code class="language-gdscript"># player.gd - persist 그룹에 추가된 노드
+func save() -&gt; Dictionary:
+    return {"hp": hp, "gold": gold, "pos_x": position.x, "pos_y": position.y}
+
+func load_data(data: Dictionary):
+    hp = data["hp"]
+    gold = data["gold"]
+    position = Vector2(data["pos_x"], data["pos_y"])</code></pre>
+      </section>
+
+      <!-- Slide 11: Autoload (싱글톤) 패턴 -->
+      <section data-narration="Autoload는 Godot에서 싱글톤 패턴을 구현하는 공식 방법입니다. 프로젝트 설정에서 Autoload로 등록한 노드는 게임이 시작될 때 자동으로 생성되고, 씬이 전환되어도 절대 사라지지 않습니다. 어디서든 이름으로 직접 접근할 수 있어서 전역 상태 관리에 매우 유용합니다.">
+        <h2>Autoload (싱글톤) 패턴</h2>
+        <div class="key-point">
+          <h3>Autoload란?</h3>
+          <p>씬 전환과 무관하게 <strong>항상 존재하는 전역 노드</strong>입니다.<br>
+          프로젝트 설정 &gt; Autoload 탭에서 등록하면 이름으로 어디서든 접근할 수 있습니다.</p>
+        </div>
+        <div class="two-columns">
+          <div>
+            <h3>Autoload 특징</h3>
+            <ul>
+              <li class="fragment">씬 전환해도 <strong>유지</strong>됨</li>
+              <li class="fragment"><strong>전역 이름</strong>으로 접근 가능</li>
+              <li class="fragment">SceneTree <strong>루트 아래</strong>에 배치</li>
+              <li class="fragment">노드 또는 <strong>스크립트</strong> 등록 가능</li>
+              <li class="fragment">등록 순서대로 초기화</li>
+            </ul>
+          </div>
+          <div>
+            <h3>등록 방법</h3>
+            <p style="font-size: 0.85em;">프로젝트 &gt; 프로젝트 설정 &gt; Autoload</p>
+            <table class="compare-table">
+              <tr>
+                <th>이름</th>
+                <th>경로</th>
+              </tr>
+              <tr>
+                <td>GameManager</td>
+                <td>res://autoload/game_manager.gd</td>
+              </tr>
+              <tr>
+                <td>AudioManager</td>
+                <td>res://autoload/audio_manager.gd</td>
+              </tr>
+              <tr>
+                <td>SaveManager</td>
+                <td>res://autoload/save_manager.gd</td>
+              </tr>
+            </table>
+          </div>
+        </div>
+        <pre><code class="language-gdscript"># 어디서든 이름으로 접근
+GameManager.add_score(100)
+AudioManager.play_sfx("coin")
+SaveManager.save_game()</code></pre>
+      </section>
+
+      <!-- Slide 12: Autoload 등록/사용 -->
+      <section data-narration="실제 Autoload 스크립트를 작성해 봅시다. 게임 매니저는 점수, 레벨, 게임 상태 같은 전역 데이터를 관리하고 시그널로 변경 사항을 알립니다. 오디오 매니저는 배경음악과 효과음 재생을 전역에서 담당합니다. 이처럼 기능별로 Autoload를 분리하면 코드 구조가 깔끔해지고 유지보수가 쉬워집니다.">
+        <h2>Autoload 등록/사용</h2>
+        <p>기능별로 Autoload를 분리하여 관리</p>
+        <div class="two-columns">
+          <div>
+            <h3 style="color: var(--gd-green);">GameManager</h3>
+            <pre><code class="language-gdscript"># autoload/game_manager.gd
+extends Node
+
+signal score_changed(new_score)
+signal game_over
+
+var score: int = 0
+var high_score: int = 0
+var current_level: int = 1
+var is_paused: bool = false
+
+func add_score(amount: int):
+    score += amount
+    if score &gt; high_score:
+        high_score = score
+    score_changed.emit(score)
+
+func reset():
+    score = 0
+    current_level = 1
+
+func pause_game():
+    is_paused = !is_paused
+    get_tree().paused = is_paused</code></pre>
+          </div>
+          <div>
+            <h3 style="color: var(--gd-blue);">AudioManager</h3>
+            <pre><code class="language-gdscript"># autoload/audio_manager.gd
+extends Node
+
+var bgm_player: AudioStreamPlayer
+var sfx_players: Array[AudioStreamPlayer]
+const MAX_SFX = 8
+
+func _ready():
+    bgm_player = AudioStreamPlayer.new()
+    bgm_player.bus = "BGM"
+    add_child(bgm_player)
+
+    for i in MAX_SFX:
+        var p = AudioStreamPlayer.new()
+        p.bus = "SFX"
+        add_child(p)
+        sfx_players.append(p)
+
+func play_bgm(stream: AudioStream):
+    bgm_player.stream = stream
+    bgm_player.play()
+
+func play_sfx(stream: AudioStream):
+    for p in sfx_players:
+        if not p.playing:
+            p.stream = stream
+            p.play()
+            return</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 13: 글로벌 게임 상태 관리 -->
+      <section data-narration="글로벌 게임 상태는 시그널 기반으로 관리하는 것이 가장 좋은 패턴입니다. 상태가 변경되면 시그널을 발생시키고, 관심 있는 노드들이 이를 구독하는 구조입니다. 이렇게 하면 Autoload가 개별 노드를 직접 참조하지 않아도 되므로 결합도가 낮아지고 유지보수가 편해집니다.">
+        <h2>글로벌 게임 상태 관리</h2>
+        <p><span class="badge badge-green">시그널 기반</span> 전역 상태 관리 패턴</p>
+        <pre><code class="language-gdscript"># autoload/global_state.gd
+extends Node
+
+# 시그널 정의
+signal health_changed(current, maximum)
+signal gold_changed(amount)
+signal inventory_updated
+signal level_changed(new_level)
+signal player_died
+
+# 전역 상태
+var player_data: Dictionary = {
+    "name": "Player",
+    "hp": 100,
+    "max_hp": 100,
+    "gold": 0,
+    "level": 1,
+    "exp": 0,
+    "exp_next": 100
+}
+
+func take_damage(amount: int):
+    player_data["hp"] = max(0, player_data["hp"] - amount)
+    health_changed.emit(player_data["hp"], player_data["max_hp"])
+    if player_data["hp"] &lt;= 0:
+        player_died.emit()
+
+func add_gold(amount: int):
+    player_data["gold"] += amount
+    gold_changed.emit(player_data["gold"])
+
+func gain_exp(amount: int):
+    player_data["exp"] += amount
+    while player_data["exp"] &gt;= player_data["exp_next"]:
+        player_data["exp"] -= player_data["exp_next"]
+        player_data["level"] += 1
+        player_data["exp_next"] = int(player_data["exp_next"] * 1.5)
+        level_changed.emit(player_data["level"])</code></pre>
+        <pre><code class="language-gdscript"># hud.gd - 어디서든 시그널 연결
+func _ready():
+    GlobalState.health_changed.connect(_on_health_changed)
+    GlobalState.gold_changed.connect(_on_gold_changed)
+
+func _on_health_changed(current, maximum):
+    health_bar.value = float(current) / maximum * 100</code></pre>
+      </section>
+
+      <!-- Slide 14: 설정 관리 (오디오/화면) -->
+      <section data-narration="게임 설정 관리는 Autoload와 ConfigFile을 조합하면 효과적입니다. 오디오 볼륨은 AudioServer의 버스 볼륨을 조절하고, 화면 설정은 DisplayServer로 전체화면이나 해상도를 변경합니다. 설정이 변경될 때마다 ConfigFile에 저장하면 다음 실행에도 유지됩니다.">
+        <h2>설정 관리 (오디오/화면)</h2>
+        <pre><code class="language-gdscript"># autoload/settings_manager.gd
+extends Node
+
+const SETTINGS_PATH = "user://settings.cfg"
+var config = ConfigFile.new()
+
+func _ready():
+    load_settings()
+    apply_all()
+
+func load_settings():
+    config.load(SETTINGS_PATH)
+
+func save_settings():
+    config.save(SETTINGS_PATH)
+
+# === 오디오 설정 ===
+func set_volume(bus_name: String, value: float):
+    var bus_idx = AudioServer.get_bus_index(bus_name)
+    AudioServer.set_bus_volume_db(bus_idx, linear_to_db(value))
+    AudioServer.set_bus_mute(bus_idx, value &lt;= 0.01)
+    config.set_value("audio", bus_name + "_vol", value)
+    save_settings()
+
+func get_volume(bus_name: String) -&gt; float:
+    return config.get_value("audio", bus_name + "_vol", 1.0)
+
+# === 화면 설정 ===
+func set_fullscreen(enabled: bool):
+    if enabled:
+        DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
+    else:
+        DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+    config.set_value("video", "fullscreen", enabled)
+    save_settings()
+
+func set_vsync(enabled: bool):
+    DisplayServer.window_set_vsync_mode(
+        DisplayServer.VSYNC_ENABLED if enabled else DisplayServer.VSYNC_DISABLED
+    )
+    config.set_value("video", "vsync", enabled)
+    save_settings()
+
+# 시작 시 모든 설정 적용
+func apply_all():
+    set_volume("Master", get_volume("Master"))
+    set_volume("BGM", get_volume("BGM"))
+    set_volume("SFX", get_volume("SFX"))
+    set_fullscreen(config.get_value("video", "fullscreen", false))
+    set_vsync(config.get_value("video", "vsync", true))</code></pre>
+      </section>
+
+      <!-- Slide 15: OS와 ProjectSettings -->
+      <section data-narration="OS 클래스와 ProjectSettings는 시스템 정보 조회와 프로젝트 전역 설정에 접근하는 수단입니다. OS를 통해 운영체제 정보, 날짜와 시간, 디버그 모드 여부를 확인할 수 있고, ProjectSettings로 프로젝트 이름, 해상도, 물리 설정 등을 코드에서 읽거나 변경할 수 있습니다.">
+        <h2>OS와 ProjectSettings</h2>
+        <div class="two-columns">
+          <div>
+            <h3 style="color: var(--gd-green);">OS 클래스</h3>
+            <pre><code class="language-gdscript"># 시스템 정보 조회
+var os_name = OS.get_name()
+# "Windows", "macOS", "Linux",
+# "Android", "iOS", "Web"
+
+# 디버그 모드 확인
+if OS.is_debug_build():
+    print("디버그 모드입니다")
+
+# 날짜/시간
+var datetime = Time.get_datetime_dict_from_system()
+print("%d년 %d월 %d일" % [
+    datetime["year"],
+    datetime["month"],
+    datetime["day"]
+])
+
+# 명령줄 인수
+var args = OS.get_cmdline_args()
+if "--server" in args:
+    start_server_mode()
+
+# 프로세스 ID
+var pid = OS.get_process_id()
+
+# 시스템 메모리 (바이트)
+var mem = OS.get_static_memory_usage()</code></pre>
+          </div>
+          <div>
+            <h3 style="color: var(--gd-blue);">ProjectSettings</h3>
+            <pre><code class="language-gdscript"># 프로젝트 설정 읽기
+var title = ProjectSettings.get_setting(
+    "application/config/name"
+)
+var width = ProjectSettings.get_setting(
+    "display/window/size/viewport_width"
+)
+var gravity = ProjectSettings.get_setting(
+    "physics/2d/default_gravity"
+)
+
+# 설정 변경 (런타임)
+ProjectSettings.set_setting(
+    "physics/2d/default_gravity", 1200
+)
+
+# 커스텀 설정 추가
+ProjectSettings.set_setting(
+    "game/difficulty", "hard"
+)
+var diff = ProjectSettings.get_setting(
+    "game/difficulty", "normal"
+)
+
+# 입력 맵 확인
+var actions = InputMap.get_actions()
+for action in actions:
+    print(action)</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 16: 사용자 데이터 경로 (user://) -->
+      <section data-narration="user 경로는 각 운영체제에서 사용자별 데이터를 저장하는 위치를 가리킵니다. 윈도우에서는 AppData, 맥에서는 Application Support, 리눅스에서는 .local/share 아래에 프로젝트 이름 폴더가 생성됩니다. 세이브 파일, 설정, 로그 등 사용자 데이터는 반드시 이 경로를 사용해야 합니다.">
+        <h2>사용자 데이터 경로 (user://)</h2>
+        <div class="key-point">
+          <h3>res:// vs user://</h3>
+          <ul>
+            <li><code>res://</code> - 프로젝트 리소스 (내보내기 후 <strong>읽기 전용</strong>)</li>
+            <li><code>user://</code> - 사용자 데이터 (<strong>읽기/쓰기</strong> 가능)</li>
+          </ul>
+        </div>
+        <table class="compare-table">
+          <tr>
+            <th>운영체제</th>
+            <th>user:// 실제 경로</th>
+          </tr>
+          <tr>
+            <td><span class="badge badge-blue">Windows</span></td>
+            <td><code>%APPDATA%\Godot\app_userdata\프로젝트명\</code></td>
+          </tr>
+          <tr>
+            <td><span class="badge badge-green">macOS</span></td>
+            <td><code>~/Library/Application Support/Godot/app_userdata/프로젝트명/</code></td>
+          </tr>
+          <tr>
+            <td><span class="badge badge-orange">Linux</span></td>
+            <td><code>~/.local/share/godot/app_userdata/프로젝트명/</code></td>
+          </tr>
+          <tr>
+            <td><span class="badge badge-red">Android</span></td>
+            <td><code>/data/data/패키지명/files/</code></td>
+          </tr>
+          <tr>
+            <td><span class="badge badge-blue">Web</span></td>
+            <td><code>IndexedDB (브라우저 저장소)</code></td>
+          </tr>
+        </table>
+        <pre><code class="language-gdscript"># 실제 경로 확인
+print(OS.get_user_data_dir())
+# Windows 예: C:/Users/Player/AppData/Roaming/Godot/app_userdata/MyGame
+
+# 하위 폴더 만들기
+DirAccess.make_dir_recursive_absolute("user://saves")
+DirAccess.make_dir_recursive_absolute("user://screenshots")
+
+# 파일 존재 여부 확인
+if FileAccess.file_exists("user://saves/slot1.json"):
+    print("세이브 슬롯 1 존재")
+
+# 폴더 내 파일 목록
+var dir = DirAccess.open("user://saves")
+if dir:
+    dir.list_dir_begin()
+    var file_name = dir.get_next()
+    while file_name != "":
+        if not dir.current_is_dir():
+            print("세이브 파일: ", file_name)
+        file_name = dir.get_next()</code></pre>
+      </section>
+
+      <!-- Slide 17: 암호화 저장 -->
+      <section data-narration="세이브 파일 조작을 방지하려면 암호화 저장을 사용할 수 있습니다. FileAccess의 open_encrypted_with_pass 메서드를 사용하면 비밀번호 기반으로 파일을 암호화하여 저장하고 불러올 수 있습니다. 완벽한 보안은 아니지만 일반 사용자의 세이브 파일 수정을 효과적으로 방지합니다.">
+        <h2>암호화 저장</h2>
+        <p>세이브 파일 변조 방지를 위한 암호화</p>
+        <div class="two-columns">
+          <div>
+            <h3 style="color: var(--gd-green);">암호화 저장</h3>
+            <pre><code class="language-gdscript">const SAVE_PASS = "my_secret_key_2024"
+
+# 암호화된 파일 저장
+func save_encrypted():
+    var data = {
+        "hp": 100,
+        "gold": 5000,
+        "items": ["sword", "shield"]
+    }
+    var json = JSON.stringify(data)
+
+    var file = FileAccess.open_encrypted_with_pass(
+        "user://save.enc",
+        FileAccess.WRITE,
+        SAVE_PASS
+    )
+    if file:
+        file.store_string(json)
+        file.close()
+        print("암호화 저장 완료")</code></pre>
+          </div>
+          <div>
+            <h3 style="color: var(--gd-blue);">복호화 로드</h3>
+            <pre><code class="language-gdscript"># 암호화된 파일 불러오기
+func load_encrypted() -&gt; Dictionary:
+    var file = FileAccess.open_encrypted_with_pass(
+        "user://save.enc",
+        FileAccess.READ,
+        SAVE_PASS
+    )
+    if file == null:
+        print("파일 열기 실패")
+        return {}
+
+    var json_str = file.get_as_text()
+    file.close()
+
+    var json = JSON.new()
+    if json.parse(json_str) == OK:
+        return json.data
+    return {}</code></pre>
+          </div>
+        </div>
+        <div class="warning">
+          <strong>주의:</strong> 비밀번호가 코드에 하드코딩되면 디컴파일로 노출될 수 있습니다. 완벽한 보안이 아닌 <strong>기본적인 변조 방지</strong> 용도로 사용하세요. 서버 기반 게임이라면 서버측 검증이 필수입니다.
+        </div>
+        <div class="tip">
+          <strong>Tip:</strong> <code>FileAccess.open_encrypted</code>에 바이트 키를 직접 전달할 수도 있습니다. 더 강력한 보안이 필요하면 서버 인증이나 해시 검증을 추가하세요.
+        </div>
+      </section>
+
+      <!-- Slide 18: 정리 -->
+      <section data-narration="이번 챕터에서 배운 내용을 정리합니다. 리소스는 데이터의 기본 단위이고, 커스텀 리소스로 게임 데이터를 체계적으로 관리할 수 있습니다. FileAccess와 JSON으로 세이브 시스템을 구현하고, ConfigFile로 설정을 관리하며, Autoload 싱글톤으로 전역 상태를 관리하는 것이 핵심 패턴입니다.">
+        <h2>Chapter 11 정리</h2>
+        <div class="key-point">
+          <h3>핵심 요약</h3>
+          <table class="compare-table">
+            <tr>
+              <th>개념</th>
+              <th>용도</th>
+              <th>핵심 클래스/키워드</th>
+            </tr>
+            <tr>
+              <td>Resource</td>
+              <td>데이터 컨테이너</td>
+              <td><code>class_name</code>, <code>@export</code></td>
+            </tr>
+            <tr>
+              <td>preload / load</td>
+              <td>리소스 불러오기</td>
+              <td><code>preload()</code>, <code>ResourceLoader</code></td>
+            </tr>
+            <tr>
+              <td>FileAccess</td>
+              <td>파일 읽기/쓰기</td>
+              <td><code>open()</code>, <code>store_*</code>, <code>get_*</code></td>
+            </tr>
+            <tr>
+              <td>JSON</td>
+              <td>구조화된 데이터 저장</td>
+              <td><code>stringify()</code>, <code>parse()</code></td>
+            </tr>
+            <tr>
+              <td>ConfigFile</td>
+              <td>설정 관리 (INI)</td>
+              <td><code>set_value()</code>, <code>get_value()</code></td>
+            </tr>
+            <tr>
+              <td>Autoload</td>
+              <td>전역 싱글톤</td>
+              <td>프로젝트 설정에서 등록</td>
+            </tr>
+            <tr>
+              <td>user://</td>
+              <td>사용자 데이터 경로</td>
+              <td><code>OS.get_user_data_dir()</code></td>
+            </tr>
+            <tr>
+              <td>암호화</td>
+              <td>세이브 변조 방지</td>
+              <td><code>open_encrypted_with_pass()</code></td>
+            </tr>
+          </table>
+        </div>
+        <div class="tip">
+          <strong>실전 팁:</strong> 작은 프로젝트라도 초기에 Autoload와 세이브 구조를 설계해두면 나중에 기능을 추가할 때 훨씬 수월합니다. 다음 챕터에서는 이 패턴들을 실전 프로젝트에 적용하는 방법을 배웁니다.
+        </div>
+      </section>
+
+      <!-- Slide 19 (end): Next Chapter -->
+      <section class="chapter-title" data-transition="zoom" data-narration="수고하셨습니다! 리소스와 데이터 관리의 모든 핵심을 학습했습니다. 커스텀 리소스, 세이브 시스템, Autoload 싱글톤 패턴은 실전 게임에서 반드시 사용하게 됩니다. 다음 챕터에서는 실전 프로젝트 패턴을 다룹니다. 프로젝트 구조 설계, 디자인 패턴, 성능 최적화, 그리고 게임을 다양한 플랫폼으로 내보내기하는 방법까지 종합적으로 배워보겠습니다.">
+        <span class="chapter-number">Next</span>
+        <h1>수고하셨습니다!</h1>
+        <br>
+        <p><a href="12-project-patterns.html" style="color: var(--gd-blue); font-size: 1.2em;">다음 챕터: 실전 프로젝트 패턴 &#8594;</a></p>
+        <br>
+        <p><a href="../index.html" style="color: #888; font-size: 0.7em;">&#8592; 목차로 돌아가기</a></p>
+      </section>
+
+    </div>
+  </div>
+  <div class="nav-footer"><a href="../index.html" style="color: #888;">Godot 초보부터 고수까지</a> | Chapter 11</div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/plugin/highlight/highlight.min.js"></script>
+  <script>
+    Reveal.initialize({ hash: true, slideNumber: true, plugins: [RevealHighlight], transition: 'slide', height: 700, center: false, margin: 0.04, minScale: 0.2, maxScale: 1.5, keyboard: { 38: null, 40: null }, mouseWheel: false });
+    document.addEventListener('keydown', function(e) { if (e.keyCode === 38 || e.keyCode === 40) { var slide = Reveal.getCurrentSlide(); if (!slide) return; var amount = 80; if (e.keyCode === 38) { slide.scrollTop -= amount; } else { slide.scrollTop += amount; } e.preventDefault(); e.stopPropagation(); } }, true);
+  </script>
+  <script src="js/narration.js"></script>
+</body>
+</html>

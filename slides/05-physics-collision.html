@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 5: 물리와 충돌 - Godot 초보부터 고수까지</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/theme/night.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/plugin/highlight/monokai.min.css">
+  <link rel="stylesheet" href="css/custom.css">
+  <link rel="stylesheet" href="css/narration.css">
+</head>
+<body>
+  <div class="reveal">
+    <div class="slides">
+
+      <!-- Slide 1: 타이틀 -->
+      <section class="chapter-title" data-transition="zoom" data-narration="챕터 5에서는 Godot의 물리 엔진과 충돌 시스템을 학습합니다. 게임에서 물체가 떨어지고, 부딪히고, 튕기는 모든 동작은 물리 엔진이 담당합니다. StaticBody2D, RigidBody2D, Area2D 같은 물리 노드와 충돌 감지 방법을 하나씩 배워보겠습니다. 물리를 이해하면 훨씬 자연스러운 게임을 만들 수 있습니다.">
+        <span class="chapter-number">Chapter 05</span>
+        <h1>물리와 충돌</h1>
+        <p class="subtitle">Physics Engine &amp; Collision Detection</p>
+        <br>
+        <p><a href="../index.html" style="color: #888; font-size: 0.6em;">&#8592; 목차로 돌아가기</a></p>
+      </section>
+
+      <!-- Slide 2: 물리 엔진 개요 -->
+      <section data-narration="Godot 4는 자체 물리 엔진인 GodotPhysics2D를 기본 탑재하고 있습니다. 물리 엔진은 중력, 마찰, 반발력 같은 물리 법칙을 자동으로 시뮬레이션합니다. 개발자가 직접 수학 공식을 구현할 필요 없이, 물리 바디 노드를 배치하고 속성만 설정하면 됩니다. 물리 시뮬레이션은 초당 60회 고정 프레임으로 실행되어 일관된 동작을 보장합니다.">
+        <h2>물리 엔진 개요</h2>
+        <div class="key-point">
+          <h3>Godot Physics 2D</h3>
+          <p>Godot 4는 <strong>자체 물리 엔진(GodotPhysics2D)</strong>을 내장하고 있으며, 중력/마찰/충돌을 자동으로 시뮬레이션합니다.</p>
+        </div>
+        <ul>
+          <li class="fragment"><strong>물리 프레임</strong>: 기본 초당 60회 고정 간격으로 실행 (프로젝트 설정에서 변경 가능)</li>
+          <li class="fragment"><strong>단위</strong>: 픽셀 단위 사용 (1미터 = 기본값은 없지만 비율 설정 가능)</li>
+          <li class="fragment"><strong>기본 중력</strong>: <code>980 px/s²</code> (프로젝트 설정 Physics &gt; 2D에서 변경)</li>
+        </ul>
+        <div class="tip fragment">
+          <strong>핵심 개념:</strong> 물리 바디 노드는 3종류 - <code>StaticBody2D</code>, <code>RigidBody2D</code>, <code>CharacterBody2D</code>. 각각 용도가 다릅니다.
+        </div>
+        <table class="compare-table fragment" style="font-size: 0.75em;">
+          <tr><th>물리 바디</th><th>움직임</th><th>주요 용도</th></tr>
+          <tr><td><code>StaticBody2D</code></td><td>움직이지 않음</td><td>벽, 바닥, 장애물</td></tr>
+          <tr><td><code>RigidBody2D</code></td><td>물리 법칙에 따라 자동</td><td>상자, 공, 파괴물</td></tr>
+          <tr><td><code>CharacterBody2D</code></td><td>코드로 직접 제어</td><td>플레이어, NPC</td></tr>
+        </table>
+      </section>
+
+      <!-- Slide 3: StaticBody2D -->
+      <section data-narration="StaticBody2D는 물리 세계에서 절대 움직이지 않는 물체를 표현합니다. 벽, 바닥, 천장, 플랫폼 같은 고정된 지형에 사용합니다. 다른 물리 바디가 StaticBody2D와 충돌하면 통과하지 못하고 밀려나거나 튕깁니다. StaticBody2D 자체는 물리 시뮬레이션의 영향을 받지 않으므로 성능이 가볍습니다. 반드시 자식으로 CollisionShape2D를 추가해야 합니다.">
+        <h2>StaticBody2D</h2>
+        <p><span class="badge badge-blue">고정 물체</span> 물리 세계에서 <strong>절대 움직이지 않는</strong> 바디</p>
+        <div class="two-columns">
+          <div>
+            <h3>특징</h3>
+            <ul>
+              <li class="fragment">중력/힘의 영향을 받지 않음</li>
+              <li class="fragment">다른 바디가 부딪히면 막아줌</li>
+              <li class="fragment">성능 비용이 매우 낮음</li>
+              <li class="fragment"><code>constant_linear_velocity</code>로 컨베이어 벨트 효과 가능</li>
+            </ul>
+          </div>
+          <div>
+            <h3>노드 구조</h3>
+            <pre><code class="language-gdscript"># 씬 트리 구조
+StaticBody2D (바닥)
+  ├── CollisionShape2D
+  └── Sprite2D (선택)</code></pre>
+            <pre><code class="language-gdscript"># 컨베이어 벨트 예제
+# StaticBody2D 속성에서 설정
+# constant_linear_velocity = Vector2(100, 0)
+# 위에 올라간 물체가 오른쪽으로 밀림</code></pre>
+          </div>
+        </div>
+        <div class="warning fragment">
+          <strong>주의:</strong> StaticBody2D를 코드로 position 변경하면 물리 엔진과 충돌이 발생합니다. 움직이는 플랫폼은 <code>AnimatableBody2D</code>를 사용하세요.
+        </div>
+      </section>
+
+      <!-- Slide 4: RigidBody2D 속성 -->
+      <section data-narration="RigidBody2D는 물리 법칙에 따라 자동으로 움직이는 물체입니다. 중력에 의해 떨어지고, 다른 물체와 충돌하면 튕기며, 힘을 가하면 밀려납니다. mass는 물체의 질량으로 충돌 시 얼마나 밀리는지에 영향을 줍니다. gravity_scale은 중력 배율로 0으로 설정하면 무중력 상태가 됩니다. linear_velocity는 현재 이동 속도를 나타내며 직접 설정도 가능합니다.">
+        <h2>RigidBody2D - 주요 속성</h2>
+        <p><span class="badge badge-green">물리 시뮬레이션</span> 물리 법칙에 따라 <strong>자동으로 움직이는</strong> 바디</p>
+        <table class="compare-table">
+          <tr><th>속성</th><th>타입</th><th>기본값</th><th>설명</th></tr>
+          <tr class="fragment"><td><code>mass</code></td><td>float</td><td>1.0</td><td>질량 (kg). 클수록 밀리기 어려움</td></tr>
+          <tr class="fragment"><td><code>gravity_scale</code></td><td>float</td><td>1.0</td><td>중력 배율. 0이면 무중력</td></tr>
+          <tr class="fragment"><td><code>linear_velocity</code></td><td>Vector2</td><td>(0,0)</td><td>현재 이동 속도 (px/s)</td></tr>
+          <tr class="fragment"><td><code>angular_velocity</code></td><td>float</td><td>0.0</td><td>회전 속도 (rad/s)</td></tr>
+          <tr class="fragment"><td><code>linear_damp</code></td><td>float</td><td>0.0</td><td>이동 감쇠 (공기 저항)</td></tr>
+          <tr class="fragment"><td><code>physics_material_override</code></td><td>PhysicsMaterial</td><td>null</td><td>마찰/반발력 재질</td></tr>
+        </table>
+        <pre class="fragment"><code class="language-gdscript"># RigidBody2D에 힘 가하기
+func _ready():
+    # 위쪽으로 발사
+    linear_velocity = Vector2(200, -500)
+
+func _on_button_pressed():
+    # 순간적인 힘 (impulse)
+    apply_impulse(Vector2(0, -300))
+    # 지속적인 힘 (force) - _physics_process에서 사용
+    apply_force(Vector2(100, 0))</code></pre>
+      </section>
+
+      <!-- Slide 5: RigidBody2D 모드 -->
+      <section data-narration="RigidBody2D의 freeze 속성과 freeze_mode를 조합하면 다양한 동작 모드를 구현할 수 있습니다. 기본 Dynamic 모드에서는 물리 법칙에 따라 자유롭게 움직입니다. freeze를 true로 설정하고 freeze_mode를 Static으로 하면 StaticBody2D처럼 동작합니다. Kinematic 모드에서는 코드로 직접 위치를 제어할 수 있습니다. 게임 중에 모드를 전환하면 재미있는 효과를 만들 수 있습니다.">
+        <h2>RigidBody2D 모드</h2>
+        <div class="two-columns">
+          <div>
+            <h3>freeze + freeze_mode 조합</h3>
+            <table class="compare-table" style="font-size: 0.75em;">
+              <tr><th>freeze</th><th>freeze_mode</th><th>동작</th></tr>
+              <tr><td>false</td><td>-</td><td><strong>Dynamic</strong>: 물리 시뮬레이션</td></tr>
+              <tr><td>true</td><td>STATIC</td><td><strong>Static</strong>: 고정, 충돌만</td></tr>
+              <tr><td>true</td><td>KINEMATIC</td><td><strong>Kinematic</strong>: 코드로 이동</td></tr>
+            </table>
+          </div>
+          <div>
+            <h3>사용 예시</h3>
+            <ul>
+              <li class="fragment"><strong>Dynamic</strong>: 떨어지는 상자, 굴러가는 공</li>
+              <li class="fragment"><strong>Static</strong>: 잠긴 문, 고정된 블록</li>
+              <li class="fragment"><strong>Kinematic</strong>: 움직이는 엘리베이터</li>
+            </ul>
+          </div>
+        </div>
+        <pre class="fragment"><code class="language-gdscript"># 게임 중 모드 전환 예제
+extends RigidBody2D
+
+func freeze_in_place():
+    # 물체를 제자리에 고정
+    freeze = true
+    freeze_mode = RigidBody2D.FREEZE_MODE_STATIC
+
+func release():
+    # 다시 물리 시뮬레이션 활성화
+    freeze = false
+
+func make_kinematic():
+    # 코드로 제어 가능한 모드
+    freeze = true
+    freeze_mode = RigidBody2D.FREEZE_MODE_KINEMATIC</code></pre>
+        <div class="tip fragment">
+          <strong>활용 팁:</strong> 퍼즐 게임에서 블록을 집어 올릴 때 Kinematic, 놓을 때 Dynamic으로 전환하면 자연스럽습니다.
+        </div>
+      </section>
+
+      <!-- Slide 6: Area2D -->
+      <section data-narration="Area2D는 물리적으로 충돌하지 않고 영역 감지만 하는 특수 노드입니다. 다른 물체가 영역에 들어왔는지, 나갔는지를 감지하는 트리거 역할을 합니다. 아이템 수집 범위, 데미지 존, 적 감지 범위 등에 주로 사용합니다. Area2D는 중력이나 감쇠를 재정의할 수도 있어서 수중 영역이나 바람 영역 같은 환경 효과에도 활용됩니다. 물리 바디와 달리 통과가 가능합니다.">
+        <h2>Area2D</h2>
+        <p><span class="badge badge-green">영역 감지</span> 물리 충돌 없이 <strong>겹침(overlap)만 감지</strong>하는 노드</p>
+        <div class="two-columns">
+          <div>
+            <h3>주요 용도</h3>
+            <ul>
+              <li class="fragment">아이템 수집 범위</li>
+              <li class="fragment">데미지 존 (함정, 용암)</li>
+              <li class="fragment">적 감지 범위 (어그로)</li>
+              <li class="fragment">씬 전환 트리거</li>
+              <li class="fragment">중력/물리 환경 재정의</li>
+            </ul>
+          </div>
+          <div>
+            <h3>환경 재정의 속성</h3>
+            <pre><code class="language-gdscript"># Area2D로 수중 영역 만들기
+# 인스펙터에서 설정:
+# gravity_space_override = REPLACE
+# gravity = 200  (느린 중력)
+# linear_damp_space_override = REPLACE
+# linear_damp = 5.0  (물 저항)</code></pre>
+          </div>
+        </div>
+        <div class="key-point fragment">
+          <h3>Area2D vs PhysicsBody2D</h3>
+          <p><strong>Area2D</strong>: 통과 가능, 감지만 함 (트리거) / <strong>PhysicsBody2D</strong>: 통과 불가, 물리 충돌 발생</p>
+        </div>
+      </section>
+
+      <!-- Slide 7: CollisionShape2D / CollisionPolygon2D -->
+      <section data-narration="모든 물리 바디와 Area2D는 반드시 자식으로 충돌 형태 노드를 가져야 합니다. CollisionShape2D는 미리 정의된 도형을 사용하고, CollisionPolygon2D는 자유로운 다각형을 직접 그릴 수 있습니다. 충돌 형태가 없으면 물리 엔진이 해당 노드를 인식하지 못합니다. 하나의 바디에 여러 개의 충돌 형태를 추가할 수도 있어서 복잡한 모양도 표현 가능합니다.">
+        <h2>CollisionShape2D / CollisionPolygon2D</h2>
+        <p>물리 바디의 <strong>충돌 영역</strong>을 정의하는 필수 자식 노드</p>
+        <div class="two-columns">
+          <div>
+            <h3>CollisionShape2D</h3>
+            <ul>
+              <li class="fragment">미리 정의된 도형 사용</li>
+              <li class="fragment"><code>shape</code> 속성에 Shape 리소스 할당</li>
+              <li class="fragment"><code>disabled</code>로 일시 비활성화</li>
+              <li class="fragment">성능이 더 좋음 (최적화된 계산)</li>
+            </ul>
+          </div>
+          <div>
+            <h3>CollisionPolygon2D</h3>
+            <ul>
+              <li class="fragment">자유로운 다각형 형태</li>
+              <li class="fragment">에디터에서 점을 찍어 그리기</li>
+              <li class="fragment">복잡한 지형에 적합</li>
+              <li class="fragment">볼록(convex) 분해 자동 처리</li>
+            </ul>
+          </div>
+        </div>
+        <pre class="fragment"><code class="language-gdscript"># 코드로 충돌 형태 생성
+func _ready():
+    var collision = CollisionShape2D.new()
+    var shape = RectangleShape2D.new()
+    shape.size = Vector2(64, 64)
+    collision.shape = shape
+    add_child(collision)
+
+# 충돌 일시 비활성화
+func disable_collision():
+    $CollisionShape2D.set_deferred("disabled", true)</code></pre>
+        <div class="warning fragment">
+          <strong>주의:</strong> 충돌 형태를 물리 프로세스 중에 직접 변경하면 오류가 발생합니다. 반드시 <code>set_deferred()</code>를 사용하세요.
+        </div>
+      </section>
+
+      <!-- Slide 8: Shape 타입들 -->
+      <section data-narration="CollisionShape2D에서 사용할 수 있는 Shape 리소스는 여러 종류가 있습니다. RectangleShape2D는 사각형으로 상자나 플랫폼에 적합합니다. CircleShape2D는 원형으로 공이나 코인에 좋고 계산이 가장 빠릅니다. CapsuleShape2D는 캡슐형으로 캐릭터에 자주 사용됩니다. 성능 면에서는 원형이 가장 빠르고, 사각형, 캡슐 순입니다. 가능하면 단순한 도형을 사용하는 것이 좋습니다.">
+        <h2>Shape 타입들</h2>
+        <table class="compare-table">
+          <tr><th>Shape</th><th>형태</th><th>주요 용도</th><th>성능</th></tr>
+          <tr class="fragment"><td><code>RectangleShape2D</code></td><td>사각형</td><td>상자, 바닥, 벽</td><td>빠름</td></tr>
+          <tr class="fragment"><td><code>CircleShape2D</code></td><td>원형</td><td>공, 코인, 총알</td><td>가장 빠름</td></tr>
+          <tr class="fragment"><td><code>CapsuleShape2D</code></td><td>캡슐</td><td>캐릭터, NPC</td><td>보통</td></tr>
+          <tr class="fragment"><td><code>SegmentShape2D</code></td><td>선분</td><td>레이저, 얇은 벽</td><td>빠름</td></tr>
+          <tr class="fragment"><td><code>ConvexPolygonShape2D</code></td><td>볼록 다각형</td><td>커스텀 형태</td><td>느림</td></tr>
+          <tr class="fragment"><td><code>ConcavePolygonShape2D</code></td><td>오목 다각형</td><td>복잡한 지형</td><td>가장 느림</td></tr>
+        </table>
+        <pre class="fragment"><code class="language-gdscript"># 코드로 다양한 Shape 생성
+var rect = RectangleShape2D.new()
+rect.size = Vector2(100, 50)
+
+var circle = CircleShape2D.new()
+circle.radius = 25.0
+
+var capsule = CapsuleShape2D.new()
+capsule.radius = 20.0
+capsule.height = 60.0</code></pre>
+        <div class="tip fragment">
+          <strong>성능 팁:</strong> 가능하면 <code>CircleShape2D</code>나 <code>RectangleShape2D</code>처럼 단순한 도형을 사용하세요. 복잡한 폴리곤은 성능에 큰 영향을 줍니다.
+        </div>
+      </section>
+
+      <!-- Slide 9: 충돌 레이어와 마스크 -->
+      <section data-narration="충돌 레이어와 마스크는 어떤 물체끼리 충돌할지 필터링하는 시스템입니다. 레이어는 이 물체가 존재하는 층이고, 마스크는 이 물체가 감지하려는 대상 층입니다. 예를 들어 플레이어가 레이어 1에 있고 적이 레이어 2에 있으면, 플레이어의 마스크에 2를 설정해야 적과 충돌합니다. 최대 32개의 레이어를 사용할 수 있으며, 프로젝트 설정에서 이름을 지정할 수 있습니다.">
+        <h2>충돌 레이어와 마스크</h2>
+        <div class="key-point">
+          <h3>Layer vs Mask</h3>
+          <p><strong>Layer</strong> = 내가 존재하는 층 (나는 누구인가) / <strong>Mask</strong> = 내가 감지하는 층 (누구와 부딪힐까)</p>
+        </div>
+        <div class="two-columns fragment">
+          <div>
+            <h3>레이어 구성 예시</h3>
+            <table class="compare-table" style="font-size: 0.7em;">
+              <tr><th>레이어</th><th>이름</th><th>대상</th></tr>
+              <tr><td>1</td><td>Player</td><td>플레이어</td></tr>
+              <tr><td>2</td><td>Enemy</td><td>적</td></tr>
+              <tr><td>3</td><td>Platform</td><td>지형</td></tr>
+              <tr><td>4</td><td>Item</td><td>아이템</td></tr>
+              <tr><td>5</td><td>Projectile</td><td>총알/투사체</td></tr>
+            </table>
+          </div>
+          <div>
+            <h3>설정 예시</h3>
+            <table class="compare-table" style="font-size: 0.7em;">
+              <tr><th>오브젝트</th><th>Layer</th><th>Mask</th></tr>
+              <tr><td>플레이어</td><td>1</td><td>2, 3, 4</td></tr>
+              <tr><td>적</td><td>2</td><td>1, 3, 5</td></tr>
+              <tr><td>바닥</td><td>3</td><td>없음</td></tr>
+              <tr><td>코인</td><td>4</td><td>1</td></tr>
+            </table>
+          </div>
+        </div>
+        <div class="tip fragment">
+          <strong>프로젝트 설정:</strong> Project &gt; Project Settings &gt; Layer Names &gt; 2D Physics에서 각 레이어에 이름을 지정하면 에디터에서 쉽게 관리할 수 있습니다.
+        </div>
+      </section>
+
+      <!-- Slide 10: 레이어/마스크 설정 코드 -->
+      <section data-narration="GDScript에서 충돌 레이어와 마스크를 코드로 제어할 수 있습니다. collision_layer와 collision_mask는 비트 플래그 방식으로 동작합니다. set_collision_layer_value와 set_collision_mask_value 함수를 사용하면 특정 레이어 번호로 간편하게 설정할 수 있습니다. 게임 중에 팀이 바뀌거나 무적 상태가 될 때 동적으로 레이어를 변경하는 패턴이 자주 사용됩니다.">
+        <h2>레이어/마스크 설정 코드</h2>
+        <pre><code class="language-gdscript"># 방법 1: 비트 플래그로 직접 설정
+# 레이어 1,3에 존재 = 0b00000101 = 5
+collision_layer = 5
+# 레이어 2,4를 감지 = 0b00001010 = 10
+collision_mask = 10</code></pre>
+        <pre class="fragment"><code class="language-gdscript"># 방법 2: 함수로 개별 레이어 설정 (추천!)
+func _ready():
+    # 레이어 1 활성화
+    set_collision_layer_value(1, true)
+    # 레이어 3도 활성화
+    set_collision_layer_value(3, true)
+
+    # 마스크 2번 감지
+    set_collision_mask_value(2, true)
+    # 마스크 4번도 감지
+    set_collision_mask_value(4, true)</code></pre>
+        <pre class="fragment"><code class="language-gdscript"># 실전: 무적 상태 토글
+func set_invincible(enabled: bool):
+    # 무적이면 적 레이어(2) 감지 해제
+    set_collision_mask_value(2, not enabled)
+    # 투사체 레이어(5) 감지도 해제
+    set_collision_mask_value(5, not enabled)</code></pre>
+        <div class="warning fragment">
+          <strong>주의:</strong> 레이어 번호는 <strong>1부터 시작</strong>합니다 (0이 아님). <code>set_collision_layer_value(1, true)</code>는 첫 번째 레이어를 활성화합니다.
+        </div>
+      </section>
+
+      <!-- Slide 11: body_entered / body_exited 시그널 -->
+      <section data-narration="Area2D는 다른 물리 바디가 영역에 들어오거나 나갈 때 시그널을 발생시킵니다. body_entered 시그널은 PhysicsBody2D가 영역에 처음 들어올 때, body_exited는 나갈 때 호출됩니다. 시그널의 매개변수로 충돌한 노드 참조를 받아서 어떤 물체인지 판별할 수 있습니다. 이 시그널은 아이템 수집, 함정 감지, 영역 진입 이벤트 등에 핵심적으로 사용됩니다.">
+        <h2>body_entered / body_exited 시그널</h2>
+        <p><span class="badge badge-blue">Area2D</span> 물리 바디가 영역에 <strong>진입/이탈</strong>할 때 발생</p>
+        <pre><code class="language-gdscript"># Area2D 스크립트
+extends Area2D
+
+func _ready():
+    # 시그널 연결
+    body_entered.connect(_on_body_entered)
+    body_exited.connect(_on_body_exited)
+
+func _on_body_entered(body: Node2D):
+    print(body.name, " 영역 진입!")
+    if body.is_in_group("player"):
+        print("플레이어가 들어왔습니다!")
+
+func _on_body_exited(body: Node2D):
+    print(body.name, " 영역 이탈!")</code></pre>
+        <div class="two-columns fragment">
+          <div>
+            <h3>감지 대상</h3>
+            <ul>
+              <li><code>body_entered</code> - PhysicsBody2D 감지</li>
+              <li><code>body_exited</code> - PhysicsBody2D 이탈</li>
+              <li><code>monitoring</code> = true 필요</li>
+            </ul>
+          </div>
+          <div>
+            <h3>이미 겹친 바디 확인</h3>
+            <pre><code class="language-gdscript"># 현재 영역 안에 있는 바디 목록
+var bodies = get_overlapping_bodies()
+for body in bodies:
+    print(body.name)</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 12: area_entered -->
+      <section data-narration="area_entered 시그널은 다른 Area2D가 영역에 들어올 때 발생합니다. body_entered와 달리 Area2D끼리의 겹침을 감지합니다. 예를 들어 플레이어의 히트박스 Area2D와 적의 공격 범위 Area2D가 겹치는 것을 감지할 수 있습니다. monitorable 속성이 true여야 다른 Area2D에 의해 감지되고, monitoring이 true여야 다른 Area2D를 감지할 수 있습니다.">
+        <h2>area_entered 시그널</h2>
+        <p><span class="badge badge-green">Area2D 간</span> 다른 Area2D와의 <strong>겹침</strong>을 감지</p>
+        <pre><code class="language-gdscript"># 히트박스/허트박스 시스템
+extends Area2D  # 허트박스 (피격 판정)
+
+func _ready():
+    area_entered.connect(_on_area_entered)
+
+func _on_area_entered(area: Area2D):
+    # 공격 히트박스가 들어왔는지 확인
+    if area.is_in_group("hitbox"):
+        var damage = area.get_parent().attack_damage
+        take_damage(damage)
+
+func take_damage(amount: int):
+    print("피해량: ", amount)</code></pre>
+        <div class="key-point fragment">
+          <h3>monitoring vs monitorable</h3>
+          <p><strong>monitoring</strong> = 이 Area가 다른 것을 감지할 수 있는가 (내가 탐색)<br>
+          <strong>monitorable</strong> = 이 Area가 다른 것에 의해 감지될 수 있는가 (남이 탐색)</p>
+        </div>
+        <pre class="fragment"><code class="language-gdscript"># 현재 겹쳐 있는 Area2D 목록
+var areas = get_overlapping_areas()
+for area in areas:
+    if area.is_in_group("danger_zone"):
+        apply_damage()</code></pre>
+      </section>
+
+      <!-- Slide 13: RayCast2D -->
+      <section data-narration="RayCast2D는 한 점에서 특정 방향으로 보이지 않는 광선을 쏘아 가장 먼저 부딪히는 물체를 감지합니다. 바닥 감지, 벽 감지, 시야 판정, 조준선 등에 널리 사용됩니다. is_colliding으로 충돌 여부를 확인하고, get_collider로 충돌한 대상을 가져옵니다. target_position 속성으로 광선의 방향과 길이를 설정합니다. 물리 프레임마다 자동으로 업데이트되므로 실시간 감지에 적합합니다.">
+        <h2>RayCast2D</h2>
+        <p><span class="badge badge-blue">광선 감지</span> 특정 방향으로 광선을 쏘아 <strong>첫 번째 충돌 지점</strong>을 감지</p>
+        <pre><code class="language-gdscript">extends CharacterBody2D
+
+@onready var ray = $RayCast2D
+
+func _physics_process(delta):
+    if ray.is_colliding():
+        var collider = ray.get_collider()       # 충돌한 객체
+        var point = ray.get_collision_point()    # 충돌 지점
+        var normal = ray.get_collision_normal()  # 충돌 면의 법선
+
+        if collider.is_in_group("enemy"):
+            print("적 발견! 위치: ", point)</code></pre>
+        <div class="two-columns fragment">
+          <div>
+            <h3>주요 속성</h3>
+            <ul>
+              <li><code>enabled</code> - 활성화 여부</li>
+              <li><code>target_position</code> - 방향과 거리</li>
+              <li><code>collision_mask</code> - 감지할 레이어</li>
+              <li><code>collide_with_areas</code> - Area 감지</li>
+              <li><code>collide_with_bodies</code> - Body 감지</li>
+            </ul>
+          </div>
+          <div>
+            <h3>활용 예시</h3>
+            <ul>
+              <li>바닥 감지 (아래 방향)</li>
+              <li>벽 감지 (좌우 방향)</li>
+              <li>적 시야 (AI)</li>
+              <li>조준선 / 레이저</li>
+              <li>절벽 감지 (발 앞 아래)</li>
+            </ul>
+          </div>
+        </div>
+        <pre class="fragment"><code class="language-gdscript"># 방향 전환 시 RayCast도 뒤집기
+func flip_direction(facing_right: bool):
+    ray.target_position.x = 100 if facing_right else -100</code></pre>
+      </section>
+
+      <!-- Slide 14: ShapeCast2D -->
+      <section data-narration="ShapeCast2D는 RayCast2D의 확장 버전으로, 가느다란 광선 대신 도형을 밀어내면서 충돌을 감지합니다. 넓은 범위의 충돌을 한 번에 검사할 수 있어서 캐릭터 크기만큼의 이동 가능 여부 확인, 폭발 범위 내 물체 감지 등에 유용합니다. RayCast2D가 한 개의 충돌만 반환하는 것과 달리 ShapeCast2D는 경로 상의 여러 충돌을 모두 감지할 수 있습니다.">
+        <h2>ShapeCast2D</h2>
+        <p><span class="badge badge-green">도형 기반 감지</span> 도형을 밀어내며 <strong>경로 상의 모든 충돌</strong>을 감지</p>
+        <div class="two-columns">
+          <div>
+            <h3>RayCast2D vs ShapeCast2D</h3>
+            <table class="compare-table" style="font-size: 0.7em;">
+              <tr><th>구분</th><th>RayCast2D</th><th>ShapeCast2D</th></tr>
+              <tr><td>감지 범위</td><td>가느다란 선</td><td>도형 크기만큼</td></tr>
+              <tr><td>결과 수</td><td>1개</td><td>여러 개</td></tr>
+              <tr><td>성능</td><td>빠름</td><td>보통</td></tr>
+              <tr><td>용도</td><td>시선/조준</td><td>넓은 범위 감지</td></tr>
+            </table>
+          </div>
+          <div>
+            <pre><code class="language-gdscript"># ShapeCast2D 사용 예제
+extends Node2D
+
+@onready var cast = $ShapeCast2D
+
+func check_landing_zone():
+    cast.force_shapecast_update()
+
+    if cast.is_colliding():
+        var count = cast.get_collision_count()
+        for i in count:
+            var obj = cast.get_collider(i)
+            print("감지: ", obj.name)</code></pre>
+          </div>
+        </div>
+        <div class="tip fragment">
+          <strong>활용 팁:</strong> 캐릭터가 좁은 통로를 지나갈 수 있는지 미리 확인할 때, 캐릭터 크기의 ShapeCast2D를 사용하면 깔끔합니다.
+        </div>
+      </section>
+
+      <!-- Slide 15: 물리 프로세스 vs 일반 프로세스 -->
+      <section data-narration="Godot에는 두 가지 업데이트 루프가 있습니다. _process는 매 렌더링 프레임마다 호출되어 프레임률에 따라 간격이 변합니다. _physics_process는 고정 간격으로 호출되어 물리 계산에 적합합니다. 물리 관련 코드는 반드시 _physics_process에서 실행해야 일관된 동작을 보장합니다. move_and_slide, apply_force 같은 물리 함수는 _physics_process에서 호출하세요. UI 업데이트나 애니메이션은 _process에서 처리합니다.">
+        <h2>물리 프로세스 vs 일반 프로세스</h2>
+        <table class="compare-table">
+          <tr><th>구분</th><th>_process(delta)</th><th>_physics_process(delta)</th></tr>
+          <tr class="fragment"><td>호출 간격</td><td>매 렌더 프레임 (가변)</td><td>고정 간격 (기본 1/60초)</td></tr>
+          <tr class="fragment"><td>delta 값</td><td>프레임마다 다름</td><td>항상 일정 (0.01667...)</td></tr>
+          <tr class="fragment"><td>용도</td><td>UI, 비주얼, 입력</td><td>물리, 이동, 충돌</td></tr>
+          <tr class="fragment"><td>FPS 영향</td><td>60fps=60회, 30fps=30회</td><td>항상 60회 (고정)</td></tr>
+        </table>
+        <pre class="fragment"><code class="language-gdscript">extends CharacterBody2D
+
+func _process(delta):
+    # UI 업데이트, 애니메이션 (프레임 의존)
+    $Sprite2D.rotation += delta * 2.0
+    update_health_bar()
+
+func _physics_process(delta):
+    # 물리 연산은 반드시 여기서!
+    velocity.y += gravity * delta
+    velocity.x = input_direction * speed
+    move_and_slide()</code></pre>
+        <div class="warning fragment">
+          <strong>흔한 실수:</strong> <code>move_and_slide()</code>를 <code>_process()</code>에서 호출하면 프레임률에 따라 이동 속도가 달라집니다. 반드시 <code>_physics_process()</code>에서 호출하세요!
+        </div>
+      </section>
+
+      <!-- Slide 16: One-Way Collision -->
+      <section data-narration="One-way collision은 한 방향으로만 충돌하고 반대 방향으로는 통과하는 기능입니다. 플랫포머 게임에서 아래에서 점프하여 올라갈 수 있지만 위에서는 서 있을 수 있는 플랫폼에 사용합니다. CollisionShape2D의 one_way_collision 속성을 true로 설정하면 됩니다. one_way_collision_margin으로 통과 판정의 여유 범위를 설정할 수 있어 더 자연스러운 느낌을 줄 수 있습니다.">
+        <h2>One-Way Collision</h2>
+        <p><span class="badge badge-blue">단방향 충돌</span> 한 방향으로만 충돌, 반대쪽은 <strong>통과 가능</strong></p>
+        <div class="two-columns">
+          <div>
+            <h3>사용 사례</h3>
+            <ul>
+              <li class="fragment">플랫포머의 통과 가능한 발판</li>
+              <li class="fragment">아래에서 점프하여 올라가기</li>
+              <li class="fragment">위에서는 서 있을 수 있음</li>
+              <li class="fragment">사다리 상단 플랫폼</li>
+            </ul>
+          </div>
+          <div>
+            <h3>설정 방법</h3>
+            <pre><code class="language-gdscript"># CollisionShape2D 인스펙터에서:
+# one_way_collision = true
+# one_way_collision_margin = 4.0
+
+# 또는 코드로:
+$CollisionShape2D.one_way_collision = true
+$CollisionShape2D.one_way_collision_margin = 4.0</code></pre>
+          </div>
+        </div>
+        <pre class="fragment"><code class="language-gdscript"># 플랫포머: 아래키로 내려가기
+extends CharacterBody2D
+
+func _physics_process(delta):
+    if Input.is_action_pressed("move_down"):
+        # 현재 서 있는 플랫폼의 충돌 일시 해제
+        if is_on_floor():
+            var collision = get_last_slide_collision()
+            if collision:
+                var platform = collision.get_collider()
+                if platform.is_in_group("one_way"):
+                    position.y += 2  # 살짝 아래로 이동하여 통과</code></pre>
+      </section>
+
+      <!-- Slide 17: 실전 - 아이템 수집 예제 -->
+      <section data-narration="지금까지 배운 물리와 충돌 개념을 종합하여 아이템 수집 시스템을 만들어봅시다. 코인 아이템은 Area2D로 만들어 플레이어가 영역에 들어오면 수집됩니다. 수집 시 점수가 증가하고 시각적 효과와 함께 사라집니다. 충돌 레이어를 분리하여 플레이어만 아이템을 수집할 수 있도록 설정합니다. 이 패턴은 거의 모든 2D 게임에서 활용되는 기본 시스템입니다.">
+        <h2>실전: 아이템 수집 예제</h2>
+        <p><span class="badge badge-green">종합 예제</span> Area2D + 충돌 레이어를 활용한 코인 수집</p>
+        <pre><code class="language-gdscript"># coin.gd - 코인 아이템 스크립트
+extends Area2D
+
+@export var point_value: int = 10
+var is_collected := false
+
+func _ready():
+    # 레이어 4(Item), 마스크 1(Player)
+    set_collision_layer_value(4, true)
+    set_collision_mask_value(1, true)
+    body_entered.connect(_on_body_entered)
+
+func _on_body_entered(body: Node2D):
+    if is_collected:
+        return
+    if body.is_in_group("player"):
+        collect(body)
+
+func collect(player: Node2D):
+    is_collected = true
+    # 충돌 비활성화 (중복 수집 방지)
+    $CollisionShape2D.set_deferred("disabled", true)
+    # 점수 추가
+    if player.has_method("add_score"):
+        player.add_score(point_value)
+    # 수집 연출 (Tween)
+    var tween = create_tween()
+    tween.tween_property(self, "scale", Vector2.ZERO, 0.3)
+    tween.tween_property(self, "modulate:a", 0.0, 0.1)
+    tween.tween_callback(queue_free)</code></pre>
+        <pre class="fragment"><code class="language-gdscript"># player.gd - 플레이어 스크립트 (일부)
+extends CharacterBody2D
+
+var score := 0
+
+func _ready():
+    add_to_group("player")
+    set_collision_layer_value(1, true)
+
+func add_score(points: int):
+    score += points
+    print("점수: ", score)</code></pre>
+      </section>
+
+      <!-- Slide 18: 정리 -->
+      <section data-narration="챕터 5에서 물리 엔진의 핵심 개념을 학습했습니다. StaticBody2D는 고정, RigidBody2D는 물리 자동, CharacterBody2D는 코드 제어 바디입니다. Area2D는 트리거 영역으로 충돌 감지에 필수적입니다. CollisionShape2D로 충돌 형태를 정의하고, 레이어와 마스크로 충돌 대상을 필터링합니다. RayCast2D와 ShapeCast2D는 광선 및 도형 기반 감지를 제공합니다. 다음 챕터에서는 시그널과 그룹을 배웁니다.">
+        <h2>Chapter 05 정리</h2>
+        <div class="key-point">
+          <h3>핵심 요약</h3>
+          <ul>
+            <li><strong>StaticBody2D</strong>: 고정 물체 (벽, 바닥)</li>
+            <li><strong>RigidBody2D</strong>: 물리 시뮬레이션 물체 (상자, 공)</li>
+            <li><strong>Area2D</strong>: 충돌 없이 영역 감지 (트리거)</li>
+            <li><strong>CollisionShape2D</strong>: 충돌 형태 정의 (필수)</li>
+          </ul>
+        </div>
+        <table class="compare-table fragment" style="font-size: 0.75em;">
+          <tr><th>개념</th><th>핵심 내용</th></tr>
+          <tr><td>충돌 레이어/마스크</td><td>어떤 물체끼리 충돌할지 필터링</td></tr>
+          <tr><td>body_entered/exited</td><td>Area2D에서 PhysicsBody 진입/이탈 감지</td></tr>
+          <tr><td>area_entered</td><td>Area2D 간 겹침 감지</td></tr>
+          <tr><td>RayCast2D</td><td>광선으로 첫 번째 충돌 감지</td></tr>
+          <tr><td>ShapeCast2D</td><td>도형으로 경로 상 모든 충돌 감지</td></tr>
+          <tr><td>_physics_process</td><td>물리 코드는 반드시 여기서 실행</td></tr>
+          <tr><td>One-Way Collision</td><td>한 방향만 충돌, 반대는 통과</td></tr>
+        </table>
+        <div class="tip fragment">
+          <strong>다음 단계:</strong> 물리 충돌과 함께 사용하는 시그널과 그룹 시스템을 다음 챕터에서 깊이 있게 학습합니다.
+        </div>
+      </section>
+
+      <!-- Slide 19: 다음 챕터 -->
+      <section class="chapter-title" data-transition="zoom" data-narration="챕터 5 물리와 충돌 학습을 완료하셨습니다. 이제 물리 바디의 종류와 충돌 감지, 레이어 시스템, 레이캐스트까지 핵심 개념을 모두 익혔습니다. 다음 챕터에서는 노드 간 통신의 핵심인 시그널과 그룹에 대해 배웁니다. 시그널은 느슨한 결합으로 코드를 깔끔하게 유지하는 필수 패턴입니다. 계속 진행해주세요.">
+        <span class="chapter-number">Next</span>
+        <h1>수고하셨습니다!</h1>
+        <br>
+        <p><a href="06-signals-groups.html" style="color: var(--gd-blue); font-size: 1.2em;">다음 챕터: 시그널과 그룹 &#8594;</a></p>
+        <br>
+        <p><a href="../index.html" style="color: #888; font-size: 0.7em;">&#8592; 목차로 돌아가기</a></p>
+      </section>
+
+    </div>
+  </div>
+  <div class="nav-footer"><a href="../index.html" style="color: #888;">Godot 초보부터 고수까지</a> | Chapter 05</div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/plugin/highlight/highlight.min.js"></script>
+  <script>
+    Reveal.initialize({ hash: true, slideNumber: true, plugins: [RevealHighlight], transition: 'slide', height: 700, center: false, margin: 0.04, minScale: 0.2, maxScale: 1.5, keyboard: { 38: null, 40: null }, mouseWheel: false });
+    document.addEventListener('keydown', function(e) { if (e.keyCode === 38 || e.keyCode === 40) { var slide = Reveal.getCurrentSlide(); if (!slide) return; var amount = 80; if (e.keyCode === 38) { slide.scrollTop -= amount; } else { slide.scrollTop += amount; } e.preventDefault(); e.stopPropagation(); } }, true);
+  </script>
+  <script src="js/narration.js"></script>
+</body>
+</html>
