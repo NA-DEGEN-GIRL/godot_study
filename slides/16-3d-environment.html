@@ -1,0 +1,958 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 16: 3D 환경과 조명 - Godot 초보부터 고수까지</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/theme/night.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/plugin/highlight/monokai.min.css">
+  <link rel="stylesheet" href="css/custom.css">
+  <link rel="stylesheet" href="css/narration.css">
+</head>
+<body>
+  <div class="reveal">
+    <div class="slides">
+
+      <!-- Slide 1: Title -->
+      <section class="chapter-title" data-transition="zoom" data-narration="챕터 16에서는 3D 환경과 조명을 다룹니다. WorldEnvironment 노드로 하늘, 안개, 톤맵, 글로우 등의 후처리 효과를 설정하고, DirectionalLight3D, OmniLight3D, SpotLight3D 등 다양한 조명 노드를 학습합니다. SSAO, SSR, GI 같은 고급 렌더링 기법과 그림자 최적화까지 다루어 여러분의 3D 월드를 시각적으로 완성하는 방법을 배웁니다.">
+        <span class="chapter-number">Chapter 16</span>
+        <h1>3D 환경과 조명</h1>
+        <p class="subtitle">WorldEnvironment, Sky, Fog, Glow, 조명 노드, GI, 그림자 최적화</p>
+        <br>
+        <p><a href="../index.html" style="color: #888; font-size: 0.6em;">&#8592; 목차로 돌아가기</a></p>
+      </section>
+
+      <!-- Slide 2: WorldEnvironment 노드 -->
+      <section data-narration="WorldEnvironment 노드는 3D 씬의 전체적인 환경 효과를 관리하는 노드입니다. 하늘, 배경색, 안개, 톤맵, 글로우, SSAO 등 후처리 효과를 하나의 Environment 리소스에 모아서 설정합니다. 씬에 하나만 존재해야 하며, 없으면 Godot이 기본 환경을 사용합니다. Camera3D에도 environment 속성이 있어 카메라별로 다른 환경을 적용할 수도 있습니다.">
+        <h2>WorldEnvironment 노드</h2>
+        <p><span class="badge badge-blue">핵심</span> 3D 씬의 전체 환경 효과를 관리</p>
+        <div class="two-columns">
+          <div>
+            <h3 style="color: var(--gd-green);">기본 설정</h3>
+            <pre><code class="language-gdscript"># 씬 트리에 WorldEnvironment 추가
+# WorldEnvironment
+#   +-- Environment 리소스 할당
+
+# GDScript로 동적 생성
+func setup_environment():
+    var world_env = WorldEnvironment.new()
+    var env = Environment.new()
+
+    # 배경 설정
+    env.background_mode = Environment.BG_SKY
+    env.ambient_light_source = (
+        Environment.AMBIENT_SOURCE_SKY
+    )
+    env.ambient_light_energy = 0.5
+
+    world_env.environment = env
+    add_child(world_env)</code></pre>
+          </div>
+          <div>
+            <h3 style="color: var(--gd-blue);">Environment 주요 섹션</h3>
+            <div class="key-point">
+              <ul>
+                <li class="fragment"><strong>Background</strong> - 하늘, 색상, 커스텀 배경</li>
+                <li class="fragment"><strong>Ambient Light</strong> - 환경광 소스와 색상</li>
+                <li class="fragment"><strong>Fog</strong> - 안개 (일반/볼류메트릭)</li>
+                <li class="fragment"><strong>Tonemap</strong> - 색조 매핑 알고리즘</li>
+                <li class="fragment"><strong>SSR</strong> - 화면 공간 반사</li>
+                <li class="fragment"><strong>SSAO</strong> - 화면 공간 앰비언트 오클루전</li>
+                <li class="fragment"><strong>SSIL</strong> - 화면 공간 간접광</li>
+                <li class="fragment"><strong>Glow</strong> - 블룸 효과</li>
+                <li class="fragment"><strong>Adjustment</strong> - 밝기, 대비, 채도 조정</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+        <div class="tip">
+          <strong>Tip:</strong> Camera3D의 environment 속성이 설정되면 WorldEnvironment보다 우선 적용됩니다. 특정 카메라에만 다른 효과를 줄 때 유용합니다.
+        </div>
+      </section>
+
+      <!-- Slide 3: Environment 리소스 -->
+      <section data-narration="Environment 리소스는 모든 환경 설정을 담는 재사용 가능한 리소스입니다. tres 파일로 저장하면 여러 씬에서 공유할 수 있고, 코드로 런타임에 속성을 변경하여 낮과 밤 전환, 날씨 효과 등을 구현할 수 있습니다. 기본적으로 배경 모드와 환경광을 먼저 설정하고, 이후 톤맵과 후처리 효과를 추가하는 순서로 작업하면 효율적입니다.">
+        <h2>Environment 리소스</h2>
+        <p>재사용 가능한 환경 설정 데이터</p>
+        <pre><code class="language-gdscript"># Environment 리소스를 코드로 설정
+@onready var world_env: WorldEnvironment = $WorldEnvironment
+
+func _ready():
+    var env = world_env.environment
+
+    # 배경 모드
+    env.background_mode = Environment.BG_SKY
+    env.background_energy_multiplier = 1.0
+
+    # 환경광 (그림자 부분의 밝기)
+    env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
+    env.ambient_light_color = Color(0.6, 0.7, 0.85)
+    env.ambient_light_energy = 0.3
+
+    # 반사 프로브가 없을 때의 기본 반사
+    env.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
+
+# 낮/밤 전환 예시
+func set_time_of_day(hour: float):
+    var env = world_env.environment
+    if hour > 6.0 and hour &lt; 18.0:
+        # 낮
+        env.ambient_light_energy = 0.5
+        env.fog_light_color = Color(0.7, 0.75, 0.85)
+    else:
+        # 밤
+        env.ambient_light_energy = 0.05
+        env.fog_light_color = Color(0.05, 0.05, 0.15)</code></pre>
+        <div class="warning">
+          <strong>주의:</strong> Environment 리소스를 여러 WorldEnvironment에서 공유할 경우, 하나를 수정하면 모두 영향받습니다. 독립적인 설정이 필요하면 <code>env.duplicate()</code>로 복제하세요.
+        </div>
+      </section>
+
+      <!-- Slide 4: 하늘 (Sky) -->
+      <section data-narration="Sky 리소스는 3D 씬의 배경 하늘을 렌더링합니다. ProceduralSkyMaterial은 코드로 생성되는 절차적 하늘로 태양 위치, 하늘 색상, 지평선 색상을 설정합니다. PhysicalSkyMaterial은 물리 기반으로 더 사실적인 하늘과 산란 효과를 제공합니다. PanoramaSkyMaterial은 HDR 파노라마 이미지를 하늘로 사용하여 가장 사실적인 배경을 만들 수 있습니다.">
+        <h2>하늘 (Sky)</h2>
+        <p>ProceduralSky / PhysicalSky / PanoramaSky</p>
+        <div class="two-columns">
+          <div>
+            <h3 style="color: var(--gd-green);">ProceduralSkyMaterial</h3>
+            <pre><code class="language-gdscript"># 절차적 하늘 - 가볍고 커스텀 용이
+func create_procedural_sky():
+    var sky_mat = ProceduralSkyMaterial.new()
+
+    # 하늘 색상 (위쪽)
+    sky_mat.sky_top_color = Color(
+        0.2, 0.4, 0.8)
+    sky_mat.sky_horizon_color = Color(
+        0.6, 0.7, 0.9)
+
+    # 지면 색상 (아래쪽)
+    sky_mat.ground_bottom_color = Color(
+        0.1, 0.07, 0.04)
+    sky_mat.ground_horizon_color = Color(
+        0.6, 0.65, 0.7)
+
+    # 태양 (DirectionalLight3D 연동)
+    sky_mat.sun_angle_max = 30.0
+    sky_mat.sun_curve = 0.15
+
+    var sky = Sky.new()
+    sky.sky_material = sky_mat
+    var env = Environment.new()
+    env.sky = sky
+    env.background_mode = Environment.BG_SKY
+    return env</code></pre>
+          </div>
+          <div>
+            <h3 style="color: var(--gd-blue);">PhysicalSkyMaterial</h3>
+            <pre><code class="language-gdscript"># 물리 기반 하늘 - 사실적 산란
+func create_physical_sky():
+    var sky_mat = PhysicalSkyMaterial.new()
+
+    # 레일리 산란 (하늘이 파란 이유)
+    sky_mat.rayleigh_coefficient = 2.0
+    sky_mat.rayleigh_color = Color(
+        0.26, 0.41, 0.58)
+
+    # 미 산란 (석양이 붉은 이유)
+    sky_mat.mie_coefficient = 0.005
+    sky_mat.mie_eccentricity = 0.8
+    sky_mat.mie_color = Color(0.69, 0.73, 0.81)
+
+    # 터빈도 (대기 혼탁도)
+    sky_mat.turbidity = 10.0
+
+    var sky = Sky.new()
+    sky.sky_material = sky_mat
+    return sky</code></pre>
+            <h3 style="color: var(--gd-orange);">PanoramaSkyMaterial</h3>
+            <pre><code class="language-gdscript"># HDR 파노라마 이미지 사용
+var sky_mat = PanoramaSkyMaterial.new()
+sky_mat.panorama = preload(
+    "res://assets/sky/sunset.hdr")
+# .hdr 또는 .exr 파일 권장</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 5: 배경 모드 -->
+      <section data-narration="Environment의 background_mode는 3D 씬의 배경을 어떻게 렌더링할지 결정합니다. BG_SKY는 Sky 리소스를 사용하고, BG_COLOR는 단색 배경, BG_CANVAS는 2D 캔버스를 3D 뒤에 렌더링합니다. BG_CAMERA_FEED는 카메라 입력을 배경으로 사용하여 AR 효과를 만들 수 있습니다. 대부분의 3D 게임에서는 BG_SKY를 사용합니다.">
+        <h2>배경 모드 (Background Mode)</h2>
+        <table class="compare-table">
+          <tr>
+            <th>모드</th>
+            <th>상수</th>
+            <th>설명</th>
+            <th>용도</th>
+          </tr>
+          <tr>
+            <td>Clear Color</td>
+            <td><code>BG_CLEAR_COLOR</code></td>
+            <td>프로젝트 설정의 기본 색상</td>
+            <td>간단한 테스트</td>
+          </tr>
+          <tr>
+            <td>Custom Color</td>
+            <td><code>BG_COLOR</code></td>
+            <td>지정한 단색 배경</td>
+            <td>스타일라이즈드 게임</td>
+          </tr>
+          <tr>
+            <td>Sky</td>
+            <td><code>BG_SKY</code></td>
+            <td>Sky 리소스 렌더링</td>
+            <td>대부분의 3D 게임</td>
+          </tr>
+          <tr>
+            <td>Canvas</td>
+            <td><code>BG_CANVAS</code></td>
+            <td>2D 캔버스를 3D 뒤에</td>
+            <td>2D 배경 + 3D 오브젝트</td>
+          </tr>
+          <tr>
+            <td>Keep</td>
+            <td><code>BG_KEEP</code></td>
+            <td>이전 프레임 유지</td>
+            <td>특수 효과</td>
+          </tr>
+          <tr>
+            <td>Camera Feed</td>
+            <td><code>BG_CAMERA_FEED</code></td>
+            <td>실제 카메라 입력</td>
+            <td>AR 애플리케이션</td>
+          </tr>
+        </table>
+        <pre><code class="language-gdscript"># 배경 모드 변경 예시
+func set_indoor_background():
+    var env = world_env.environment
+    # 실내: 단색 배경 + 약한 환경광
+    env.background_mode = Environment.BG_COLOR
+    env.background_color = Color(0.02, 0.02, 0.03)
+    env.ambient_light_energy = 0.1
+
+func set_outdoor_background():
+    var env = world_env.environment
+    # 야외: 하늘 배경 + 하늘 기반 환경광
+    env.background_mode = Environment.BG_SKY
+    env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
+    env.ambient_light_energy = 0.4</code></pre>
+      </section>
+
+      <!-- Slide 6: 안개 (Fog / Volumetric Fog) -->
+      <section data-narration="안개는 3D 씬에 깊이감과 분위기를 더하는 중요한 효과입니다. 일반 Fog는 거리에 따라 색상을 블렌딩하여 가벼운 비용으로 원거리 안개를 표현합니다. Volumetric Fog는 3D 공간에서 실제로 빛이 산란되는 효과를 시뮬레이션하여 광선이 안개를 통과하는 모습을 사실적으로 렌더링합니다. 볼류메트릭 안개는 비용이 높으므로 필요한 곳에만 사용하세요.">
+        <h2>안개 (Fog / Volumetric Fog)</h2>
+        <div class="two-columns">
+          <div>
+            <h3 style="color: var(--gd-green);">일반 Fog (거리 기반)</h3>
+            <pre><code class="language-gdscript"># 가볍고 기본적인 안개 효과
+func setup_fog():
+    var env = world_env.environment
+
+    env.fog_enabled = true
+    env.fog_light_color = Color(
+        0.7, 0.75, 0.85)
+    env.fog_light_energy = 1.0
+
+    # 밀도 모드
+    env.fog_density = 0.001   # 전체 밀도
+    env.fog_aerial_perspective = 0.5
+
+    # 높이 기반 안개 (골짜기에 안개)
+    env.fog_height = 0.0       # 안개 높이 기준
+    env.fog_height_density = 0.1</code></pre>
+            <div class="tip">
+              <strong>Tip:</strong> fog_aerial_perspective는 원거리 오브젝트에 안개가 더 강하게 적용되게 합니다. 0.0은 균일, 1.0은 원거리 강조입니다.
+            </div>
+          </div>
+          <div>
+            <h3 style="color: var(--gd-blue);">Volumetric Fog (볼류메트릭)</h3>
+            <pre><code class="language-gdscript"># 사실적인 3D 안개 (비용 높음)
+func setup_volumetric_fog():
+    var env = world_env.environment
+
+    env.volumetric_fog_enabled = true
+    env.volumetric_fog_density = 0.02
+    env.volumetric_fog_albedo = Color(
+        0.9, 0.9, 0.95)
+    env.volumetric_fog_emission = Color(
+        0.0, 0.0, 0.0)
+
+    # 빛 산란 (God rays 효과)
+    env.volumetric_fog_gi_inject = 1.0
+    env.volumetric_fog_anisotropy = 0.6
+
+    # 범위 설정
+    env.volumetric_fog_length = 200.0
+    env.volumetric_fog_detail_spread = 2.0</code></pre>
+            <div class="warning">
+              <strong>성능:</strong> Volumetric Fog는 Forward+ 렌더러에서만 지원됩니다. 모바일 렌더러에서는 일반 Fog만 사용하세요.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 7: Tonemap -->
+      <section data-narration="톤맵핑은 HDR 렌더링 결과를 모니터가 표시할 수 있는 LDR 범위로 변환하는 과정입니다. Linear는 변환 없이 그대로 출력하고, Reinhard는 부드러운 하이라이트 롤오프를 제공합니다. Filmic은 영화적 느낌의 S커브를, ACES는 영화 산업 표준으로 가장 사실적인 색감을 제공합니다. 대부분의 3D 게임에서 ACES 또는 Filmic을 사용합니다.">
+        <h2>Tonemap (톤맵핑)</h2>
+        <p><span class="badge badge-green">후처리</span> HDR을 LDR로 변환하는 알고리즘</p>
+        <pre><code class="language-gdscript">func setup_tonemap():
+    var env = world_env.environment
+
+    # 톤맵 모드 선택
+    env.tonemap_mode = Environment.TONE_MAP_ACES   # 권장
+    env.tonemap_exposure = 1.0     # 노출 (밝기 조절)
+    env.tonemap_white = 6.0        # 화이트 포인트</code></pre>
+        <table class="compare-table">
+          <tr>
+            <th>모드</th>
+            <th>상수</th>
+            <th>특징</th>
+            <th>권장 용도</th>
+          </tr>
+          <tr>
+            <td>Linear</td>
+            <td><code>TONE_MAP_LINEAR</code></td>
+            <td>변환 없음, 밝은 부분 잘림</td>
+            <td>디버그, 2D 혼합</td>
+          </tr>
+          <tr>
+            <td>Reinhard</td>
+            <td><code>TONE_MAP_REINHARD</code></td>
+            <td>부드러운 롤오프, 약간 탈색</td>
+            <td>밝은 야외 씬</td>
+          </tr>
+          <tr>
+            <td>Filmic</td>
+            <td><code>TONE_MAP_FILMIC</code></td>
+            <td>S커브, 영화적 느낌, 어두운 톤</td>
+            <td>시네마틱 게임</td>
+          </tr>
+          <tr>
+            <td>ACES</td>
+            <td><code>TONE_MAP_ACES</code></td>
+            <td>영화 표준, 가장 사실적 색감</td>
+            <td>대부분의 3D 게임 (권장)</td>
+          </tr>
+        </table>
+        <div class="key-point">
+          <h3>tonemap_exposure 활용</h3>
+          <ul>
+            <li><strong>0.5 이하</strong> - 어둡고 무거운 분위기 (호러, 던전)</li>
+            <li><strong>1.0</strong> - 기본값 (일반적인 야외)</li>
+            <li><strong>1.5 이상</strong> - 밝고 화사한 분위기 (카툰, 판타지)</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- Slide 8: 자동 노출 (Auto Exposure) -->
+      <section data-narration="자동 노출은 인간의 눈이 밝은 곳에서 어두운 곳으로 이동할 때 적응하는 것처럼, 카메라가 보는 장면의 평균 밝기에 따라 자동으로 노출을 조절하는 기능입니다. 어두운 동굴에서 밝은 야외로 나갈 때 순간적으로 눈부셨다가 적응하는 효과를 자연스럽게 연출할 수 있습니다. 속도 파라미터로 적응 시간을 조절합니다.">
+        <h2>자동 노출 (Auto Exposure)</h2>
+        <p>장면 밝기에 따라 자동으로 노출 조절</p>
+        <pre><code class="language-gdscript">func setup_auto_exposure():
+    var env = world_env.environment
+
+    env.auto_exposure_enabled = true
+
+    # 노출 범위
+    env.auto_exposure_min_sensitivity = 50.0    # 최소 감도 (밝은 씬)
+    env.auto_exposure_max_sensitivity = 800.0   # 최대 감도 (어두운 씬)
+
+    # 적응 속도
+    env.auto_exposure_speed = 2.5   # 높을수록 빠르게 적응
+
+    # 기준 밝기 스케일
+    env.auto_exposure_scale = 0.4   # 목표 평균 밝기
+
+# 실전 예시: 동굴 입구 연출
+# 1. 동굴 내부는 어두움 -> 자동 노출이 감도를 높임
+# 2. 동굴 출구에서 밝은 야외로 -> 순간 화이트아웃
+# 3. 자동 노출이 감도를 낮춰 정상 밝기로 복원
+# -> auto_exposure_speed를 낮추면 적응 시간이 길어져 더 극적</code></pre>
+        <div class="two-columns">
+          <div>
+            <div class="key-point">
+              <h3>파라미터 가이드</h3>
+              <ul>
+                <li><strong>min_sensitivity</strong> - 밝은 야외에서의 감도</li>
+                <li><strong>max_sensitivity</strong> - 어두운 실내에서의 감도</li>
+                <li><strong>speed</strong> - 적응 속도 (1.0=느림, 5.0=빠름)</li>
+                <li><strong>scale</strong> - 목표 밝기 (낮으면 전체적으로 어두움)</li>
+              </ul>
+            </div>
+          </div>
+          <div>
+            <div class="tip">
+              <strong>Tip:</strong> 자동 노출을 사용할 때는 tonemap_exposure를 1.0으로 유지하세요. 둘 다 조절하면 예측하기 어려운 밝기가 됩니다. 의도한 연출이 아니라면 auto_exposure_speed를 2.0 이상으로 빠르게 설정하는 것이 플레이어에게 편합니다.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 9: 글로우 (Glow) -->
+      <section data-narration="글로우, 또는 블룸 효과는 밝은 부분이 빛나는 것처럼 주변으로 빛이 번지는 후처리 효과입니다. 네온 조명, 마법 이펙트, 태양 광선 등에 사용되며 게임의 시각적 품질을 크게 향상시킵니다. 여러 단계의 블러 레벨을 조합하여 다양한 크기의 글로우를 만들 수 있고, HDR 임계값으로 어느 밝기부터 빛날지를 조절합니다.">
+        <h2>글로우 (Glow / Bloom)</h2>
+        <p><span class="badge badge-orange">후처리</span> 밝은 부분이 빛나는 블룸 효과</p>
+        <pre><code class="language-gdscript">func setup_glow():
+    var env = world_env.environment
+
+    env.glow_enabled = true
+
+    # 블룸 강도
+    env.glow_intensity = 0.8     # 전체 글로우 강도
+    env.glow_strength = 1.2      # 글로우 세기
+    env.glow_bloom = 0.1         # 전체 화면 블룸 양
+
+    # HDR 임계값 (이 밝기 이상에서만 글로우)
+    env.glow_hdr_threshold = 1.0
+    env.glow_hdr_scale = 2.0
+    env.glow_hdr_luminance_cap = 12.0
+
+    # 블러 레벨 (7단계, 각각 다른 크기의 글로우)
+    env.glow_levels_1 = true    # 가장 작은 글로우
+    env.glow_levels_2 = false
+    env.glow_levels_3 = true    # 중간 글로우
+    env.glow_levels_4 = false
+    env.glow_levels_5 = true    # 큰 글로우
+    env.glow_levels_6 = false
+    env.glow_levels_7 = false
+
+    # 블렌드 모드
+    env.glow_blend_mode = Environment.GLOW_BLEND_MODE_ADDITIVE  # 가산 합성
+    # 다른 옵션: GLOW_BLEND_MODE_SCREEN, GLOW_BLEND_MODE_SOFTLIGHT, GLOW_BLEND_MODE_REPLACE</code></pre>
+        <div class="tip">
+          <strong>Tip:</strong> glow_hdr_threshold = 1.0이면 표준 밝기 이상에서만 글로우가 발생합니다. 0.0으로 설정하면 모든 밝기에서 글로우가 적용되어 몽환적인 느낌을 줍니다. 네온 머티리얼의 emission_energy를 2.0 이상으로 설정하면 글로우 효과가 잘 드러납니다.
+        </div>
+      </section>
+
+      <!-- Slide 10: SSAO / SSR -->
+      <section data-narration="SSAO는 화면 공간 앰비언트 오클루전으로, 오브젝트가 만나는 모서리와 틈새에 자연스러운 그림자를 추가하여 입체감을 높이는 기법입니다. SSR은 화면 공간 반사로, 바닥이나 물 표면에 실시간 반사를 렌더링합니다. 두 효과 모두 화면에 보이는 정보만 사용하므로 한계가 있지만 비용 대비 효과가 뛰어납니다.">
+        <h2>SSAO / SSR</h2>
+        <p>화면 공간 기반 앰비언트 오클루전과 반사</p>
+        <div class="two-columns">
+          <div>
+            <h3 style="color: var(--gd-green);">SSAO (앰비언트 오클루전)</h3>
+            <pre><code class="language-gdscript">func setup_ssao():
+    var env = world_env.environment
+
+    env.ssao_enabled = true
+    env.ssao_radius = 1.0       # 오클루전 반경
+    env.ssao_intensity = 2.0    # 강도
+    env.ssao_power = 1.5        # 감쇠 곡선
+    env.ssao_detail = 0.5       # 디테일 수준
+    env.ssao_horizon = 0.06     # 지평선 각도
+    env.ssao_sharpness = 0.98   # 선명도
+    env.ssao_light_affect = 0.0 # 직접광 영향
+
+    # SSIL (간접 조명)도 함께 사용하면 효과적
+    env.ssil_enabled = true
+    env.ssil_radius = 5.0
+    env.ssil_intensity = 1.0</code></pre>
+            <div class="tip">
+              <strong>Tip:</strong> SSAO만으로도 씬의 입체감이 크게 향상됩니다. 성능이 부담되면 radius를 줄이고 intensity를 높여 비슷한 효과를 내세요.
+            </div>
+          </div>
+          <div>
+            <h3 style="color: var(--gd-blue);">SSR (화면 공간 반사)</h3>
+            <pre><code class="language-gdscript">func setup_ssr():
+    var env = world_env.environment
+
+    env.ssr_enabled = true
+    env.ssr_max_steps = 64      # 레이 마칭 스텝 수
+    env.ssr_fade_in = 0.15      # 페이드 인 거리
+    env.ssr_fade_out = 2.0      # 페이드 아웃 거리
+    env.ssr_depth_tolerance = 0.2
+
+    # SSR은 roughness가 낮은
+    # 매끄러운 표면에서만 잘 보임
+    # StandardMaterial3D.metallic = 1.0
+    # StandardMaterial3D.roughness = 0.0</code></pre>
+            <div class="warning">
+              <strong>한계:</strong> SSR은 화면에 보이지 않는 오브젝트는 반사하지 못합니다. 카메라 밖의 물체나 자기 자신의 뒷면은 반사에 나타나지 않습니다. 완벽한 반사가 필요하면 ReflectionProbe를 함께 사용하세요.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 11: SDFGI / VoxelGI / LightmapGI -->
+      <section data-narration="글로벌 일루미네이션은 빛이 표면에서 반사되어 다른 표면을 간접적으로 밝히는 현상을 시뮬레이션합니다. Godot 4는 세 가지 GI 방식을 제공합니다. SDFGI는 실시간으로 작동하며 야외에 적합합니다. VoxelGI는 실시간이지만 범위가 제한되어 실내에 좋습니다. LightmapGI는 미리 구워서 가장 품질이 높지만 정적 오브젝트만 지원합니다.">
+        <h2>글로벌 일루미네이션 (GI)</h2>
+        <p><span class="badge badge-blue">고급</span> 간접광으로 사실적인 조명 표현</p>
+        <table class="compare-table">
+          <tr>
+            <th>방식</th>
+            <th>실시간</th>
+            <th>범위</th>
+            <th>품질</th>
+            <th>비용</th>
+            <th>적합한 용도</th>
+          </tr>
+          <tr>
+            <td><strong>SDFGI</strong></td>
+            <td>실시간</td>
+            <td>넓음</td>
+            <td>중상</td>
+            <td>높음</td>
+            <td>야외, 오픈월드</td>
+          </tr>
+          <tr>
+            <td><strong>VoxelGI</strong></td>
+            <td>실시간</td>
+            <td>제한적</td>
+            <td>중</td>
+            <td>중</td>
+            <td>실내, 제한된 영역</td>
+          </tr>
+          <tr>
+            <td><strong>LightmapGI</strong></td>
+            <td>베이크</td>
+            <td>무제한</td>
+            <td>최고</td>
+            <td>낮음 (런타임)</td>
+            <td>정적 씬, 모바일</td>
+          </tr>
+        </table>
+        <pre><code class="language-gdscript"># SDFGI 설정 (Environment에서)
+func setup_sdfgi():
+    var env = world_env.environment
+    env.sdfgi_enabled = true
+    env.sdfgi_use_occlusion = true
+    env.sdfgi_cascades = 4           # 캐스케이드 수 (2~8)
+    env.sdfgi_min_cell_size = 0.2    # 최소 셀 크기
+    env.sdfgi_energy = 1.0           # GI 강도
+    env.sdfgi_normal_bias = 1.1
+    env.sdfgi_probe_bias = 1.1
+
+# VoxelGI 노드 (씬에 추가)
+# VoxelGI 노드 선택 후 Bake 버튼 클릭
+# subdiv = 128 또는 256 권장
+# extents로 범위 설정
+
+# LightmapGI 노드 (씬에 추가)
+# 정적 오브젝트에 GI Mode = Static 설정 필수
+# LightmapGI 선택 후 Bake 버튼 클릭
+# 메시에 UV2(라이트맵 UV)가 필요함</code></pre>
+        <div class="tip">
+          <strong>Tip:</strong> SDFGI는 Forward+ 렌더러 전용입니다. 모바일에서는 LightmapGI를 사용하세요. VoxelGI는 실내 씬에서 빠르게 결과를 볼 수 있어 프로토타이핑에 좋습니다.
+        </div>
+      </section>
+
+      <!-- Slide 12: DirectionalLight3D 상세 -->
+      <section data-narration="DirectionalLight3D는 태양이나 달처럼 무한히 먼 곳에서 오는 평행광입니다. 위치는 의미가 없고 회전 방향만 중요합니다. 3D 씬에서 가장 기본이 되는 조명으로, 하늘의 태양과 연동하여 낮과 밤을 연출할 수 있습니다. 그림자 설정이 성능에 큰 영향을 미치므로 캐스케이드 설정을 잘 이해해야 합니다.">
+        <h2>DirectionalLight3D 상세</h2>
+        <p><span class="badge badge-green">필수</span> 태양/달 - 평행광원</p>
+        <pre><code class="language-gdscript"># DirectionalLight3D 코드 설정
+func setup_sun():
+    var sun = DirectionalLight3D.new()
+    sun.light_color = Color(1.0, 0.95, 0.85)   # 약간 따뜻한 태양
+    sun.light_energy = 1.0                       # 밝기
+    sun.light_angular_distance = 1.0             # 태양 크기 (소프트 섀도)
+
+    # 그림자 설정
+    sun.shadow_enabled = true
+    sun.shadow_bias = 0.05
+    sun.shadow_normal_bias = 1.0
+
+    # 그림자 캐스케이드 (거리별 그림자 품질)
+    sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
+    sun.directional_shadow_max_distance = 100.0       # 최대 그림자 거리
+    sun.directional_shadow_split_1 = 0.1              # 1단계 분할 비율
+    sun.directional_shadow_split_2 = 0.2              # 2단계 분할 비율
+    sun.directional_shadow_split_3 = 0.5              # 3단계 분할 비율
+
+    # 회전으로 태양 방향 설정 (X축: 고도, Y축: 방위)
+    sun.rotation_degrees = Vector3(-45, 30, 0)
+
+    add_child(sun)</code></pre>
+        <div class="key-point">
+          <h3>그림자 캐스케이드 (Split)</h3>
+          <ul>
+            <li><strong>SHADOW_PARALLEL_2_SPLITS</strong> - 2단계 분할 (가볍지만 저품질)</li>
+            <li><strong>SHADOW_PARALLEL_4_SPLITS</strong> - 4단계 분할 (권장, 균형 잡힌 품질)</li>
+            <li>가까운 거리에 높은 해상도, 먼 거리에 낮은 해상도로 분배</li>
+            <li>split 비율을 작게 하면 가까운 곳의 그림자가 더 선명해짐</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- Slide 13: OmniLight3D 상세 -->
+      <section data-narration="OmniLight3D는 전구나 횃불처럼 모든 방향으로 빛을 방출하는 점광원입니다. position이 빛의 위치이고, range로 도달 거리를, attenuation으로 감쇠 곡선을 설정합니다. 감쇠 값이 1이면 선형, 2에 가까울수록 급격히 감소합니다. 그림자를 켜면 비용이 6배 증가하므로 중요한 조명에만 그림자를 활성화하세요.">
+        <h2>OmniLight3D 상세</h2>
+        <p><span class="badge badge-blue">점광원</span> 모든 방향으로 퍼지는 빛</p>
+        <div class="two-columns">
+          <div>
+            <pre><code class="language-gdscript"># 횃불 조명 예시
+func create_torch_light() -> OmniLight3D:
+    var light = OmniLight3D.new()
+    light.light_color = Color(1.0, 0.7, 0.3)
+    light.light_energy = 2.0
+    light.omni_range = 8.0
+    light.omni_attenuation = 1.5
+
+    # 그림자
+    light.shadow_enabled = true
+    light.shadow_bias = 0.1
+
+    # 그림자 모드
+    light.omni_shadow_mode = (
+        OmniLight3D.SHADOW_DUAL_PARABOLOID
+    )
+    # SHADOW_DUAL_PARABOLOID: 빠름
+    # SHADOW_CUBE: 고품질
+
+    return light
+
+# 횃불 깜빡임 효과
+func _process(delta: float):
+    var flicker = 1.0 + sin(
+        Time.get_ticks_msec() * 0.01
+    ) * 0.15
+    flicker += randf_range(-0.05, 0.05)
+    torch_light.light_energy = 2.0 * flicker</code></pre>
+          </div>
+          <div>
+            <h3 style="color: var(--gd-blue);">감쇠 곡선 (Attenuation)</h3>
+            <table class="compare-table">
+              <tr>
+                <th>값</th>
+                <th>감쇠 유형</th>
+                <th>느낌</th>
+              </tr>
+              <tr>
+                <td>0.5</td>
+                <td>매우 느린 감쇠</td>
+                <td>넓게 퍼지는 부드러운 빛</td>
+              </tr>
+              <tr>
+                <td>1.0</td>
+                <td>선형 감쇠</td>
+                <td>자연스러운 기본값</td>
+              </tr>
+              <tr>
+                <td>2.0</td>
+                <td>물리 기반 역제곱</td>
+                <td>사실적이지만 급격</td>
+              </tr>
+              <tr>
+                <td>4.0</td>
+                <td>매우 빠른 감쇠</td>
+                <td>좁은 범위 집중</td>
+              </tr>
+            </table>
+            <div class="key-point">
+              <h3>성능 팁</h3>
+              <ul>
+                <li>그림자 ON인 OmniLight는 6면 렌더링</li>
+                <li>DUAL_PARABOLOID 모드가 CUBE보다 빠름</li>
+                <li>작은 range일수록 그림자 비용 감소</li>
+                <li>bake_mode = BAKE_STATIC이면 정적 조명으로 베이크 가능</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 14: SpotLight3D 상세 -->
+      <section data-narration="SpotLight3D는 손전등이나 무대 조명처럼 원뿔 형태로 빛을 방출하는 스팟 광원입니다. range와 attenuation은 OmniLight와 동일하고, 추가로 spot_angle로 원뿔 각도를, spot_angle_attenuation으로 가장자리 부드러움을 조절합니다. 손전등 효과를 만들 때 카메라에 자식으로 추가하면 자연스럽게 시점을 따라갑니다.">
+        <h2>SpotLight3D 상세</h2>
+        <p><span class="badge badge-orange">스팟 광원</span> 원뿔 형태의 방향성 빛</p>
+        <pre><code class="language-gdscript"># 손전등 효과
+func create_flashlight() -> SpotLight3D:
+    var light = SpotLight3D.new()
+    light.light_color = Color(0.95, 0.95, 1.0)  # 약간 차가운 흰색
+    light.light_energy = 3.0
+
+    light.spot_range = 20.0           # 도달 거리
+    light.spot_attenuation = 1.2      # 거리 감쇠
+    light.spot_angle = 25.0           # 원뿔 반각 (도)
+    light.spot_angle_attenuation = 0.8  # 가장자리 부드러움
+
+    light.shadow_enabled = true
+    light.shadow_bias = 0.05
+    return light
+
+# 카메라에 부착하여 손전등 구현
+# CameraPivot
+#   +-- Camera3D
+#   +-- SpotLight3D (position 약간 아래+옆)
+
+# 손전등 켜기/끄기
+func _input(event: InputEvent):
+    if event.is_action_pressed("flashlight"):
+        flashlight.visible = !flashlight.visible</code></pre>
+        <div class="two-columns">
+          <div>
+            <div class="key-point">
+              <h3>SpotLight3D 주요 속성</h3>
+              <ul>
+                <li><strong>spot_range</strong> - 빛이 도달하는 최대 거리</li>
+                <li><strong>spot_angle</strong> - 원뿔의 반각 (0~90도)</li>
+                <li><strong>spot_angle_attenuation</strong> - 가장자리 부드러움 (낮을수록 부드럽게)</li>
+              </ul>
+            </div>
+          </div>
+          <div>
+            <div class="tip">
+              <strong>활용 예시:</strong> 가로등(spot_angle=40, 아래 방향), 무대 조명(여러 색상의 SpotLight), 차량 전조등(2개의 SpotLight 병렬), 감시 카메라 빛(회전 애니메이션 추가)
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 15: 조명 에너지와 색온도 -->
+      <section data-narration="조명의 에너지는 밝기를 결정하고, 색상은 분위기를 좌우합니다. 물리 기반 렌더링에서는 빛의 색온도를 켈빈 단위로 설정하면 더 사실적인 조명을 만들 수 있습니다. 따뜻한 조명은 3000K 정도의 주황빛이고, 차가운 조명은 6500K 이상의 파란빛입니다. 여러 색온도의 조명을 조합하면 현실적이고 풍부한 조명 환경이 완성됩니다.">
+        <h2>조명 에너지와 색온도</h2>
+        <p>밝기와 색상으로 분위기 연출</p>
+        <pre><code class="language-gdscript"># 색온도를 Color로 변환하는 유틸리티
+func kelvin_to_color(kelvin: float) -> Color:
+    # 근사값으로 색온도 변환
+    var temp = kelvin / 100.0
+    var r: float
+    var g: float
+    var b: float
+    if temp &lt;= 66:
+        r = 1.0
+        g = clamp((99.47 * log(temp) - 161.12) / 255.0, 0.0, 1.0)
+        b = clamp((138.52 * log(temp - 10) - 305.04) / 255.0, 0.0, 1.0) if temp > 10 else 0.0
+    else:
+        r = clamp((329.7 * pow(temp - 60, -0.133)) / 255.0, 0.0, 1.0)
+        g = clamp((288.12 * pow(temp - 60, -0.0755)) / 255.0, 0.0, 1.0)
+        b = 1.0
+    return Color(r, g, b)</code></pre>
+        <table class="compare-table">
+          <tr>
+            <th>색온도 (K)</th>
+            <th>색상</th>
+            <th>실제 광원</th>
+            <th>분위기</th>
+          </tr>
+          <tr>
+            <td>1800K</td>
+            <td style="color: #ff8c00;">주황</td>
+            <td>촛불, 일몰</td>
+            <td>따뜻함, 로맨틱</td>
+          </tr>
+          <tr>
+            <td>2700K</td>
+            <td style="color: #ffb347;">따뜻한 노랑</td>
+            <td>백열등</td>
+            <td>아늑함, 실내</td>
+          </tr>
+          <tr>
+            <td>4000K</td>
+            <td style="color: #fff4e0;">중성 흰색</td>
+            <td>형광등</td>
+            <td>사무적, 일상</td>
+          </tr>
+          <tr>
+            <td>5500K</td>
+            <td style="color: #ffffff;">순백색</td>
+            <td>한낮 태양</td>
+            <td>자연스러움</td>
+          </tr>
+          <tr>
+            <td>7000K+</td>
+            <td style="color: #add8e6;">차가운 파랑</td>
+            <td>흐린 하늘, 달빛</td>
+            <td>차가움, 신비</td>
+          </tr>
+        </table>
+        <div class="tip">
+          <strong>Tip:</strong> Godot 4의 Light3D에는 <code>light_temperature</code> 속성이 있어 직접 켈빈 값을 설정할 수 있습니다. <code>light.light_color</code>보다 물리적으로 더 정확합니다.
+        </div>
+      </section>
+
+      <!-- Slide 16: 그림자 설정과 최적화 -->
+      <section data-narration="그림자는 3D 씬의 사실감을 크게 높이지만 렌더링 비용도 상당합니다. 그림자 맵 해상도가 높을수록 선명하지만 메모리와 GPU 비용이 증가합니다. bias 값이 너무 낮으면 줄무늬 아티팩트가, 너무 높으면 그림자가 떠다니는 피터 팬 현상이 발생합니다. 멀리 있는 조명은 그림자를 끄고 가까운 중요 조명에만 켜는 것이 최적화의 기본입니다.">
+        <h2>그림자 설정과 최적화</h2>
+        <p><span class="badge badge-red">성능</span> 품질과 성능의 균형 맞추기</p>
+        <pre><code class="language-gdscript"># 프로젝트 설정에서 전역 그림자 품질
+# rendering/lights_and_shadows/directional_shadow/size = 4096
+# rendering/lights_and_shadows/directional_shadow/soft_shadow_filter_quality = 2
+# rendering/lights_and_shadows/positional_shadow/soft_shadow_filter_quality = 2
+
+# 런타임에서 그림자 품질 조절 (옵션 메뉴)
+func set_shadow_quality(quality: int):
+    var rd = RenderingServer
+    match quality:
+        0:  # 낮음
+            rd.directional_shadow_atlas_set_size(1024, true)
+            rd.positional_soft_shadow_filter_set_quality(
+                rd.SHADOW_QUALITY_SOFT_VERY_LOW)
+        1:  # 중간
+            rd.directional_shadow_atlas_set_size(2048, true)
+            rd.positional_soft_shadow_filter_set_quality(
+                rd.SHADOW_QUALITY_SOFT_LOW)
+        2:  # 높음
+            rd.directional_shadow_atlas_set_size(4096, true)
+            rd.positional_soft_shadow_filter_set_quality(
+                rd.SHADOW_QUALITY_SOFT_MEDIUM)</code></pre>
+        <div class="two-columns">
+          <div>
+            <div class="key-point">
+              <h3>그림자 아티팩트 해결</h3>
+              <ul>
+                <li><strong>줄무늬(Acne)</strong> - shadow_bias 증가 (0.05~0.2)</li>
+                <li><strong>피터 팬</strong> - shadow_bias 감소, normal_bias 조절</li>
+                <li><strong>해상도 부족</strong> - shadow atlas 크기 증가</li>
+                <li><strong>깜빡임</strong> - shadow_normal_bias 증가</li>
+              </ul>
+            </div>
+          </div>
+          <div>
+            <div class="warning">
+              <strong>최적화 규칙:</strong> 1) 동시에 그림자를 켠 조명은 4~6개 이하로 제한. 2) 작은 장식 조명은 그림자 OFF. 3) distance_fade를 활용하여 멀리 있는 조명의 그림자를 자동 해제. 4) 모바일에서는 그림자 atlas를 1024~2048로 제한.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 17: 실전 - 야외/실내 환경 구성 -->
+      <section data-narration="실전에서 야외 환경과 실내 환경은 설정 방식이 다릅니다. 야외는 DirectionalLight3D로 태양을 만들고 PhysicalSkyMaterial로 하늘을 구성합니다. SDFGI나 SSAO로 간접광을 추가하고 볼류메트릭 안개로 대기감을 줍니다. 실내는 OmniLight와 SpotLight 조합에 VoxelGI나 LightmapGI를 사용합니다. 두 환경을 부드럽게 전환하는 방법도 살펴봅시다.">
+        <h2>실전: 야외 / 실내 환경 구성</h2>
+        <div class="two-columns">
+          <div>
+            <h3 style="color: var(--gd-green);">야외 환경</h3>
+            <pre><code class="language-gdscript">func setup_outdoor():
+    var env = world_env.environment
+
+    # 하늘
+    var sky_mat = PhysicalSkyMaterial.new()
+    sky_mat.turbidity = 10.0
+    var sky = Sky.new()
+    sky.sky_material = sky_mat
+    env.sky = sky
+    env.background_mode = Environment.BG_SKY
+
+    # 태양
+    sun.light_energy = 1.0
+    sun.rotation_degrees.x = -45
+
+    # 환경광 (하늘 기반)
+    env.ambient_light_source = (
+        Environment.AMBIENT_SOURCE_SKY)
+    env.ambient_light_energy = 0.3
+
+    # 후처리
+    env.tonemap_mode = Environment.TONE_MAP_ACES
+    env.ssao_enabled = true
+    env.sdfgi_enabled = true
+    env.glow_enabled = true
+    env.glow_intensity = 0.4
+
+    # 안개 (대기감)
+    env.volumetric_fog_enabled = true
+    env.volumetric_fog_density = 0.005
+    env.volumetric_fog_albedo = Color(
+        0.9, 0.9, 0.95)</code></pre>
+          </div>
+          <div>
+            <h3 style="color: var(--gd-blue);">실내 환경</h3>
+            <pre><code class="language-gdscript">func setup_indoor():
+    var env = world_env.environment
+
+    # 배경 (하늘 없음)
+    env.background_mode = (
+        Environment.BG_COLOR)
+    env.background_color = Color(
+        0.01, 0.01, 0.02)
+
+    # 환경광 (약하게)
+    env.ambient_light_source = (
+        Environment.AMBIENT_SOURCE_COLOR)
+    env.ambient_light_color = Color(
+        0.15, 0.12, 0.1)
+    env.ambient_light_energy = 0.2
+
+    # 후처리
+    env.tonemap_mode = (
+        Environment.TONE_MAP_ACES)
+    env.tonemap_exposure = 1.2
+    env.ssao_enabled = true
+    env.ssao_intensity = 3.0
+    env.glow_enabled = true
+    env.glow_intensity = 0.6
+
+    # 안개 없음 또는 약하게
+    env.fog_enabled = false
+
+# 환경 전환 (Tween 사용)
+func transition_to_indoor(duration: float):
+    var tween = create_tween()
+    var env = world_env.environment
+    tween.tween_property(
+        env, "ambient_light_energy",
+        0.2, duration)
+    tween.parallel().tween_property(
+        env, "tonemap_exposure",
+        1.2, duration)</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 18: 정리 -->
+      <section data-narration="이번 챕터에서는 3D 환경과 조명의 모든 핵심 요소를 학습했습니다. WorldEnvironment와 Environment 리소스로 후처리 효과를 관리하고, 세 가지 하늘 머티리얼과 배경 모드를 배웠습니다. 안개, 톤맵, 글로우, SSAO, SSR, GI 같은 고급 효과와 세 가지 조명 노드의 상세 설정, 그리고 그림자 최적화까지 다루었습니다. 이 지식으로 아름다운 3D 월드를 만들어보세요.">
+        <h2>Chapter 16 정리</h2>
+        <div class="key-point">
+          <h3>핵심 요약</h3>
+          <table class="compare-table">
+            <tr>
+              <th>주제</th>
+              <th>핵심 내용</th>
+            </tr>
+            <tr>
+              <td>WorldEnvironment</td>
+              <td>Environment 리소스로 모든 후처리 효과 관리</td>
+            </tr>
+            <tr>
+              <td>하늘</td>
+              <td>Procedural(가벼움) / Physical(사실적) / Panorama(이미지)</td>
+            </tr>
+            <tr>
+              <td>안개</td>
+              <td>일반 Fog(거리 기반) / Volumetric Fog(볼류메트릭, God rays)</td>
+            </tr>
+            <tr>
+              <td>후처리</td>
+              <td>Tonemap(ACES 권장), Auto Exposure, Glow, SSAO, SSR</td>
+            </tr>
+            <tr>
+              <td>GI</td>
+              <td>SDFGI(야외) / VoxelGI(실내) / LightmapGI(정적, 최고 품질)</td>
+            </tr>
+            <tr>
+              <td>조명 노드</td>
+              <td>Directional(태양) / Omni(전구) / Spot(손전등)</td>
+            </tr>
+            <tr>
+              <td>그림자 최적화</td>
+              <td>Atlas 크기, 캐스케이드, bias 조절, 동시 그림자 수 제한</td>
+            </tr>
+          </table>
+        </div>
+        <div class="tip">
+          <strong>실습 과제:</strong> 야외 씬을 만들고 PhysicalSkyMaterial + DirectionalLight3D로 태양을 설정하세요. rotation.x를 -80(정오)에서 0(석양)까지 Tween으로 애니메이션하면서 자동 노출과 안개 색상이 어떻게 변하는지 관찰해보세요.
+        </div>
+      </section>
+
+      <!-- Slide 19 (end): Complete -->
+      <section class="chapter-title" data-transition="zoom" data-narration="챕터 16 3D 환경과 조명을 마치겠습니다. 이제 여러분은 아름다운 3D 환경을 만들 수 있는 도구를 모두 갖추었습니다. 다음 챕터에서는 3D 메시와 머티리얼을 다룹니다. StandardMaterial3D의 알베도, 메탈릭, 러프니스, 노멀맵 등 PBR 머티리얼 설정과 메시 생성 방법을 배워 오브젝트의 표면을 사실적으로 표현해봅시다.">
+        <span class="chapter-number">Next</span>
+        <h1>수고하셨습니다!</h1>
+        <br>
+        <p><a href="17-3d-materials.html" style="color: var(--gd-blue); font-size: 1.2em;">다음 챕터: 3D 메시와 머티리얼 &#8594;</a></p>
+        <br>
+        <p><a href="../index.html" style="color: #888; font-size: 0.7em;">&#8592; 목차로 돌아가기</a></p>
+      </section>
+
+    </div>
+  </div>
+  <div class="nav-footer"><a href="../index.html" style="color: #888;">Godot 초보부터 고수까지</a> | Chapter 16</div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/plugin/highlight/highlight.min.js"></script>
+  <script>
+    Reveal.initialize({ hash: true, slideNumber: true, plugins: [RevealHighlight], transition: 'slide', height: 700, center: false, margin: 0.04, minScale: 0.2, maxScale: 1.5, keyboard: { 38: null, 40: null }, mouseWheel: false });
+    document.addEventListener('keydown', function(e) { if (e.keyCode === 38 || e.keyCode === 40) { var slide = Reveal.getCurrentSlide(); if (!slide) return; var amount = 80; if (e.keyCode === 38) { slide.scrollTop -= amount; } else { slide.scrollTop += amount; } e.preventDefault(); e.stopPropagation(); } }, true);
+  </script>
+  <script src="js/narration.js"></script>
+</body>
+</html>

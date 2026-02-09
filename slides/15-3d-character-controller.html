@@ -1,0 +1,1052 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 15: 3D 캐릭터 컨트롤러 - Godot 초보부터 고수까지</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/theme/night.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/plugin/highlight/monokai.min.css">
+  <link rel="stylesheet" href="css/custom.css">
+  <link rel="stylesheet" href="css/narration.css">
+</head>
+<body>
+  <div class="reveal">
+    <div class="slides">
+
+      <!-- Slide 1: Title -->
+      <section class="chapter-title" data-transition="zoom" data-narration="챕터 15에서는 3D 캐릭터 컨트롤러를 본격적으로 만들어봅니다. 1인칭 FPS 컨트롤러부터 3인칭 TPS 컨트롤러까지, 마우스 캡처와 카메라 회전, WASD 이동, 중력과 점프, 스프린트와 웅크리기, 그리고 계단 오르기와 경사면 처리까지 실전에서 바로 사용할 수 있는 완성도 높은 캐릭터 컨트롤러를 단계별로 구현합니다.">
+        <span class="chapter-number">Chapter 15</span>
+        <h1>3D 캐릭터 컨트롤러</h1>
+        <p class="subtitle">FPS/TPS 컨트롤러, 마우스 룩, 이동, 점프, 경사면 처리</p>
+        <br>
+        <p><a href="../index.html" style="color: #888; font-size: 0.6em;">&#8592; 목차로 돌아가기</a></p>
+      </section>
+
+      <!-- Slide 2: FPS 컨트롤러 개요 -->
+      <section data-narration="FPS 컨트롤러는 1인칭 시점에서 플레이어를 조작하는 가장 기본적인 3D 컨트롤러입니다. CharacterBody3D를 루트로 사용하고, CollisionShape3D로 물리 충돌을 처리하며, Camera3D가 플레이어의 눈 역할을 합니다. 카메라를 별도의 피봇 노드에 넣으면 상하 회전과 좌우 회전을 독립적으로 관리할 수 있어 매우 편리합니다.">
+        <h2>FPS 컨트롤러 개요</h2>
+        <p><span class="badge badge-blue">1인칭</span> 가장 기본적인 3D 캐릭터 컨트롤러</p>
+        <div class="two-columns">
+          <div>
+            <h3 style="color: var(--gd-green);">씬 트리 구조</h3>
+            <pre><code class="language-gdscript"># FPS 컨트롤러 노드 구조
+# Player (CharacterBody3D)
+#  +-- CollisionShape3D (캡슐)
+#  +-- CameraPivot (Node3D)  -- 상하 회전용
+#  |   +-- Camera3D           -- 눈 위치
+#  +-- RayCast3D              -- 바닥 감지
+#  +-- MeshInstance3D         -- 디버그용 몸체</code></pre>
+            <div class="tip">
+              <strong>Tip:</strong> CameraPivot을 캐릭터 머리 높이(약 1.6m)에 배치하면 자연스러운 눈높이가 됩니다. CollisionShape3D는 높이 1.8m, 반지름 0.3m 캡슐이 일반적입니다.
+            </div>
+          </div>
+          <div>
+            <h3 style="color: var(--gd-blue);">핵심 구성 요소</h3>
+            <div class="key-point">
+              <ul>
+                <li class="fragment"><strong>CharacterBody3D</strong> - move_and_slide() 기반 이동</li>
+                <li class="fragment"><strong>CollisionShape3D</strong> - 캡슐 충돌체 (CapsuleShape3D)</li>
+                <li class="fragment"><strong>CameraPivot</strong> - X축 회전 (상하 룩)</li>
+                <li class="fragment"><strong>Player 루트</strong> - Y축 회전 (좌우 룩)</li>
+                <li class="fragment"><strong>Camera3D</strong> - current = true로 활성화</li>
+              </ul>
+            </div>
+            <div class="warning">
+              <strong>주의:</strong> Camera3D를 직접 Player에 붙이면 상하좌우 회전이 섞여 짐벌 락 문제가 발생합니다. 반드시 피봇 구조를 사용하세요.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 3: 마우스 캡처 -->
+      <section data-narration="FPS 게임에서는 마우스 커서를 화면 중앙에 고정하고 숨겨야 합니다. Input.set_mouse_mode 함수로 마우스 모드를 제어하며, MOUSE_MODE_CAPTURED를 설정하면 커서가 숨겨지고 화면 중앙에 고정됩니다. ESC 키로 마우스를 해제하고, 다시 클릭하면 캡처하는 토글 로직을 구현해야 사용자가 편리하게 메뉴를 사용할 수 있습니다.">
+        <h2>마우스 캡처 (Input.MOUSE_MODE_CAPTURED)</h2>
+        <p>커서를 숨기고 화면 중앙에 고정</p>
+        <pre><code class="language-gdscript">extends CharacterBody3D
+
+func _ready():
+    # 마우스를 캡처하여 화면 중앙에 고정
+    Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+
+func _unhandled_input(event: InputEvent):
+    # ESC로 마우스 해제
+    if event.is_action_pressed("ui_cancel"):
+        Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+    # 마우스 클릭으로 다시 캡처
+    if event is InputEventMouseButton and event.pressed:
+        if Input.get_mouse_mode() == Input.MOUSE_MODE_VISIBLE:
+            Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)</code></pre>
+        <table class="compare-table">
+          <tr>
+            <th>마우스 모드</th>
+            <th>커서 표시</th>
+            <th>커서 이동</th>
+            <th>용도</th>
+          </tr>
+          <tr>
+            <td><code>MOUSE_MODE_VISIBLE</code></td>
+            <td>보임</td>
+            <td>자유</td>
+            <td>UI, 메뉴</td>
+          </tr>
+          <tr>
+            <td><code>MOUSE_MODE_CAPTURED</code></td>
+            <td>숨김</td>
+            <td>중앙 고정</td>
+            <td>FPS/TPS 게임플레이</td>
+          </tr>
+          <tr>
+            <td><code>MOUSE_MODE_HIDDEN</code></td>
+            <td>숨김</td>
+            <td>자유</td>
+            <td>커스텀 커서</td>
+          </tr>
+          <tr>
+            <td><code>MOUSE_MODE_CONFINED</code></td>
+            <td>보임</td>
+            <td>창 내부 제한</td>
+            <td>RTS, 전략 게임</td>
+          </tr>
+        </table>
+        <div class="tip">
+          <strong>Tip:</strong> 일시정지 메뉴를 열 때 MOUSE_MODE_VISIBLE로, 닫을 때 MOUSE_MODE_CAPTURED로 전환하면 자연스러운 흐름이 됩니다.
+        </div>
+      </section>
+
+      <!-- Slide 4: 마우스 룩 (회전) -->
+      <section data-narration="마우스 룩은 InputEventMouseMotion 이벤트의 relative 속성을 사용합니다. 마우스의 좌우 이동량으로 플레이어 루트를 Y축 회전하고, 상하 이동량으로 카메라 피봇을 X축 회전합니다. 상하 회전은 반드시 clamp로 제한해야 카메라가 뒤집히지 않습니다. 감도 값을 적절히 조절하면 자연스러운 시점 회전이 구현됩니다.">
+        <h2>마우스 룩 (회전)</h2>
+        <p><span class="badge badge-green">핵심</span> 마우스 상대 이동량으로 카메라 회전</p>
+        <pre><code class="language-gdscript">@onready var camera_pivot: Node3D = $CameraPivot
+
+@export var mouse_sensitivity: float = 0.002  # 마우스 감도
+
+func _unhandled_input(event: InputEvent):
+    if event is InputEventMouseMotion:
+        if Input.get_mouse_mode() == Input.MOUSE_MODE_CAPTURED:
+            # 좌우 회전: 플레이어 루트를 Y축으로 회전
+            rotate_y(-event.relative.x * mouse_sensitivity)
+
+            # 상하 회전: 카메라 피봇을 X축으로 회전
+            camera_pivot.rotate_x(-event.relative.y * mouse_sensitivity)
+
+            # 상하 회전 각도 제한 (-90도 ~ +90도)
+            camera_pivot.rotation.x = clamp(
+                camera_pivot.rotation.x,
+                deg_to_rad(-89),  # 아래 한계
+                deg_to_rad(89)    # 위 한계
+            )</code></pre>
+        <div class="key-point">
+          <h3>마우스 룩 핵심 원리</h3>
+          <ul>
+            <li><strong>event.relative</strong> - 이전 프레임 대비 마우스 이동 픽셀 (Vector2)</li>
+            <li><strong>rotate_y()</strong> - 플레이어 루트의 수평 회전 (좌우 둘러보기)</li>
+            <li><strong>rotate_x()</strong> - 카메라 피봇의 수직 회전 (위아래 둘러보기)</li>
+            <li><strong>clamp()</strong> - 수직 회전을 -89도~+89도로 제한하여 뒤집힘 방지</li>
+          </ul>
+        </div>
+        <div class="warning">
+          <strong>주의:</strong> 감도 값이 너무 크면 어지러움을 유발합니다. 0.001~0.005 범위에서 시작하고 옵션 메뉴에서 사용자가 조절할 수 있게 만드세요.
+        </div>
+      </section>
+
+      <!-- Slide 5: 카메라 피봇 구조 -->
+      <section data-narration="카메라 피봇 구조는 3D 게임에서 가장 중요한 설계 패턴 중 하나입니다. 플레이어 루트 노드가 수평 회전을 담당하고, 자식인 카메라 피봇이 수직 회전을 담당하여 두 축의 회전을 완전히 분리합니다. 이렇게 하면 짐벌 락 없이 깔끔한 카메라 제어가 가능합니다. FPS와 TPS 모두 이 피봇 구조를 기반으로 합니다.">
+        <h2>카메라 피봇 구조</h2>
+        <p>수평/수직 회전을 분리하는 핵심 구조</p>
+        <div class="two-columns">
+          <div>
+            <h3 style="color: var(--gd-green);">FPS 피봇</h3>
+            <pre><code class="language-gdscript"># FPS: 피봇이 머리 높이에 위치
+# Player (CharacterBody3D)
+#   rotation.y = 좌우 회전
+#   +-- CameraPivot (Node3D)
+#       position.y = 1.6  (눈 높이)
+#       rotation.x = 상하 회전
+#       +-- Camera3D
+#           position = (0, 0, 0)
+
+# 에디터에서 설정:
+# CameraPivot.position = Vector3(0, 1.6, 0)
+# Camera3D.current = true</code></pre>
+          </div>
+          <div>
+            <h3 style="color: var(--gd-blue);">TPS 피봇</h3>
+            <pre><code class="language-gdscript"># TPS: 카메라가 뒤로 떨어져 있음
+# Player (CharacterBody3D)
+#   rotation.y = 좌우 회전
+#   +-- CameraPivot (Node3D)
+#       position.y = 1.6
+#       rotation.x = 상하 회전
+#       +-- SpringArm3D
+#           spring_length = 4.0
+#           +-- Camera3D
+#               position = (0, 0, 0)
+
+# SpringArm3D가 벽 충돌 시
+# 자동으로 카메라를 당겨줌</code></pre>
+          </div>
+        </div>
+        <div class="key-point">
+          <h3>피봇 구조의 장점</h3>
+          <ul>
+            <li class="fragment"><strong>축 분리</strong> - Y축 회전(루트)과 X축 회전(피봇)이 독립적</li>
+            <li class="fragment"><strong>짐벌 락 방지</strong> - 두 축이 섞이지 않아 안정적</li>
+            <li class="fragment"><strong>FPS/TPS 전환 용이</strong> - 카메라 위치만 바꾸면 전환 가능</li>
+            <li class="fragment"><strong>추가 효과</strong> - 카메라 흔들림, 기울기 등을 피봇에 적용 가능</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- Slide 6: WASD 이동 (방향 벡터 변환) -->
+      <section data-narration="WASD 이동에서 가장 중요한 것은 입력 방향을 카메라가 바라보는 방향 기준으로 변환하는 것입니다. 플레이어가 오른쪽을 바라보고 있을 때 W키를 누르면 오른쪽으로 가야 하니까요. basis 속성을 활용하면 로컬 좌표계의 전방과 우측 벡터를 쉽게 구할 수 있습니다. 입력 벡터를 정규화하여 대각선 이동 시 속도가 빨라지는 문제도 방지해야 합니다.">
+        <h2>WASD 이동 (방향 벡터 변환)</h2>
+        <p><span class="badge badge-blue">핵심</span> 입력 방향을 카메라 기준으로 변환</p>
+        <pre><code class="language-gdscript">@export var speed: float = 5.0
+
+func _physics_process(delta: float):
+    # 1. 입력 벡터 구하기 (정규화됨)
+    var input_dir := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
+
+    # 2. 플레이어의 바라보는 방향 기준으로 변환
+    #    transform.basis.z = 로컬 후방 벡터 (Godot은 -Z가 전방)
+    #    transform.basis.x = 로컬 우측 벡터
+    var direction := (transform.basis * Vector3(input_dir.x, 0, input_dir.y)).normalized()
+
+    # 3. 수평 속도 적용
+    if direction:
+        velocity.x = direction.x * speed
+        velocity.z = direction.z * speed
+    else:
+        velocity.x = 0.0
+        velocity.z = 0.0
+
+    move_and_slide()</code></pre>
+        <div class="key-point">
+          <h3>방향 벡터 변환 원리</h3>
+          <ul>
+            <li><strong>Input.get_vector()</strong> - 4방향 입력을 Vector2(-1~1, -1~1)로 반환</li>
+            <li><strong>transform.basis</strong> - 노드의 로컬 좌표축 (3x3 행렬)</li>
+            <li><strong>basis * Vector3(x, 0, y)</strong> - 로컬 좌표를 월드 좌표로 변환</li>
+            <li><strong>.normalized()</strong> - 대각선 이동 시 속도 초과 방지</li>
+          </ul>
+        </div>
+        <div class="tip">
+          <strong>Tip:</strong> 프로젝트 설정에서 move_forward, move_back, move_left, move_right 입력 액션을 W, S, A, D 키로 매핑하세요.
+        </div>
+      </section>
+
+      <!-- Slide 7: 이동 + 마우스 룩 통합 -->
+      <section data-narration="지금까지 만든 마우스 룩과 WASD 이동을 하나의 스크립트로 통합합니다. ready에서 마우스를 캡처하고, unhandled_input에서 마우스 회전을 처리하고, physics_process에서 이동과 중력을 처리합니다. 이 기본 구조가 FPS 컨트롤러의 뼈대가 됩니다. 코드를 한 곳에 모아두면 흐름을 파악하기 쉽고 이후 기능을 추가하기에도 편리합니다.">
+        <h2>이동 + 마우스 룩 통합</h2>
+        <p>FPS 컨트롤러의 기본 뼈대 완성</p>
+        <pre><code class="language-gdscript">extends CharacterBody3D
+
+@onready var camera_pivot: Node3D = $CameraPivot
+
+@export var speed: float = 5.0
+@export var mouse_sensitivity: float = 0.002
+
+func _ready():
+    Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+
+func _unhandled_input(event: InputEvent):
+    # 마우스 룩
+    if event is InputEventMouseMotion:
+        if Input.get_mouse_mode() == Input.MOUSE_MODE_CAPTURED:
+            rotate_y(-event.relative.x * mouse_sensitivity)
+            camera_pivot.rotate_x(-event.relative.y * mouse_sensitivity)
+            camera_pivot.rotation.x = clamp(
+                camera_pivot.rotation.x, deg_to_rad(-89), deg_to_rad(89)
+            )
+    # ESC 토글
+    if event.is_action_pressed("ui_cancel"):
+        Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+    elif event is InputEventMouseButton and event.pressed:
+        if Input.get_mouse_mode() == Input.MOUSE_MODE_VISIBLE:
+            Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+
+func _physics_process(delta: float):
+    # 이동
+    var input_dir := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
+    var direction := (transform.basis * Vector3(input_dir.x, 0, input_dir.y)).normalized()
+
+    if direction:
+        velocity.x = direction.x * speed
+        velocity.z = direction.z * speed
+    else:
+        velocity.x = 0.0
+        velocity.z = 0.0
+
+    move_and_slide()</code></pre>
+      </section>
+
+      <!-- Slide 8: 중력과 점프 3D -->
+      <section data-narration="3D에서도 2D와 마찬가지로 중력을 매 프레임 velocity.y에 누적하고, 바닥에 있을 때 점프 입력이 들어오면 위쪽으로 순간 속도를 부여합니다. is_on_floor 함수로 바닥 접촉을 판별하며, ProjectSettings에서 중력 값을 가져오면 프로젝트 전체에서 일관된 물리 동작을 유지할 수 있습니다. 코요테 타임도 3D에서 동일하게 적용 가능합니다.">
+        <h2>중력과 점프 (3D)</h2>
+        <p><span class="badge badge-green">물리</span> 자연스러운 낙하와 점프 구현</p>
+        <pre><code class="language-gdscript">@export var jump_velocity: float = 4.5
+@export var coyote_time: float = 0.15  # 코요테 타임
+
+# 프로젝트 설정에서 중력 값 가져오기
+var gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
+var coyote_timer: float = 0.0
+
+func _physics_process(delta: float):
+    # 중력 적용
+    if not is_on_floor():
+        velocity.y -= gravity * delta
+        coyote_timer -= delta
+    else:
+        coyote_timer = coyote_time  # 바닥이면 코요테 타이머 리셋
+
+    # 점프 (바닥 또는 코요테 타임 내)
+    if Input.is_action_just_pressed("jump"):
+        if is_on_floor() or coyote_timer > 0.0:
+            velocity.y = jump_velocity
+            coyote_timer = 0.0  # 이중 점프 방지
+
+    # ... 이동 코드 ...
+    move_and_slide()</code></pre>
+        <div class="two-columns">
+          <div>
+            <div class="key-point">
+              <h3>중력 관련 값</h3>
+              <ul>
+                <li><strong>기본 중력</strong> - 9.8 m/s (프로젝트 설정)</li>
+                <li><strong>점프 속도</strong> - 4.5 ~ 6.0 (게임에 따라 조절)</li>
+                <li><strong>코요테 타임</strong> - 0.1 ~ 0.2초 권장</li>
+              </ul>
+            </div>
+          </div>
+          <div>
+            <div class="tip">
+              <strong>Tip:</strong> 더 자연스러운 점프를 위해 상승 시에는 기본 중력을, 하강 시에는 1.5~2배 중력을 적용하면 게임이 한결 쾌적해집니다. <code>if velocity.y &lt; 0: velocity.y -= gravity * 1.5 * delta</code>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 9: 가속/감속 이동 -->
+      <section data-narration="즉각적인 이동 대신 가속과 감속을 적용하면 훨씬 부드럽고 현실적인 움직임이 됩니다. lerp 함수로 현재 속도를 목표 속도로 서서히 변화시키는 방식이 가장 간단합니다. move_toward 함수를 사용하면 일정한 속도로 가감속되어 더 예측 가능한 조작감을 제공합니다. 지면과 공중에서 다른 가속도를 적용하면 더욱 자연스러운 제어가 됩니다.">
+        <h2>가속/감속 이동</h2>
+        <p>부드러운 움직임을 위한 보간 적용</p>
+        <div class="two-columns">
+          <div>
+            <h3 style="color: var(--gd-green);">lerp 방식 (부드러운)</h3>
+            <pre><code class="language-gdscript">@export var speed: float = 5.0
+@export var acceleration: float = 10.0
+@export var deceleration: float = 8.0
+@export var air_control: float = 0.3
+
+func _physics_process(delta: float):
+    var input_dir := Input.get_vector(
+        "move_left", "move_right",
+        "move_forward", "move_back"
+    )
+    var direction := (transform.basis
+        * Vector3(input_dir.x, 0, input_dir.y)
+    ).normalized()
+
+    var accel = acceleration if is_on_floor() \
+        else acceleration * air_control
+
+    if direction:
+        velocity.x = lerp(
+            velocity.x,
+            direction.x * speed,
+            accel * delta
+        )
+        velocity.z = lerp(
+            velocity.z,
+            direction.z * speed,
+            accel * delta
+        )
+    else:
+        velocity.x = lerp(
+            velocity.x, 0.0,
+            deceleration * delta
+        )
+        velocity.z = lerp(
+            velocity.z, 0.0,
+            deceleration * delta
+        )</code></pre>
+          </div>
+          <div>
+            <h3 style="color: var(--gd-blue);">move_toward 방식 (일정한)</h3>
+            <pre><code class="language-gdscript">@export var speed: float = 5.0
+@export var accel_rate: float = 50.0
+@export var decel_rate: float = 40.0
+
+func apply_movement(
+    direction: Vector3, delta: float
+):
+    var target_vel := direction * speed
+    var current_vel := Vector3(
+        velocity.x, 0, velocity.z
+    )
+
+    if direction:
+        current_vel = current_vel.move_toward(
+            target_vel,
+            accel_rate * delta
+        )
+    else:
+        current_vel = current_vel.move_toward(
+            Vector3.ZERO,
+            decel_rate * delta
+        )
+
+    velocity.x = current_vel.x
+    velocity.z = current_vel.z</code></pre>
+            <div class="key-point">
+              <h3>비교</h3>
+              <ul>
+                <li><strong>lerp</strong> - 지수적 감속, 부드럽지만 완전히 0에 도달하지 않음</li>
+                <li><strong>move_toward</strong> - 선형 감속, 예측 가능하고 정확히 0에 도달</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 10: 스프린트 -->
+      <section data-narration="스프린트는 특정 키를 누르고 있을 때 이동 속도를 증가시키는 기능입니다. 단순히 속도 배수를 곱하는 방식이 가장 쉽고, 여기에 스태미나 시스템을 추가하면 전략적 요소가 됩니다. 카메라 FOV를 동적으로 변경하면 스프린트 중 속도감을 시각적으로 강화할 수 있습니다. Tween으로 부드러운 FOV 전환을 구현하세요.">
+        <h2>스프린트</h2>
+        <p><span class="badge badge-orange">기능</span> 달리기 속도 + 스태미나 + FOV 변화</p>
+        <pre><code class="language-gdscript">@export var walk_speed: float = 5.0
+@export var sprint_speed: float = 8.5
+@export var sprint_fov: float = 85.0
+@export var normal_fov: float = 75.0
+@export var max_stamina: float = 100.0
+@export var stamina_drain: float = 20.0   # 초당 소모
+@export var stamina_regen: float = 15.0   # 초당 회복
+
+@onready var camera: Camera3D = $CameraPivot/Camera3D
+
+var current_stamina: float
+var is_sprinting: bool = false
+
+func _ready():
+    current_stamina = max_stamina
+
+func _physics_process(delta: float):
+    # 스프린트 판정
+    is_sprinting = (Input.is_action_pressed("sprint")
+        and current_stamina > 0.0
+        and Input.get_vector("move_left", "move_right",
+            "move_forward", "move_back").length() > 0.1)
+
+    # 속도 결정
+    var current_speed = sprint_speed if is_sprinting else walk_speed
+
+    # 스태미나 관리
+    if is_sprinting:
+        current_stamina -= stamina_drain * delta
+        current_stamina = max(0.0, current_stamina)
+    else:
+        current_stamina += stamina_regen * delta
+        current_stamina = min(max_stamina, current_stamina)
+
+    # FOV 부드러운 전환
+    var target_fov = sprint_fov if is_sprinting else normal_fov
+    camera.fov = lerp(camera.fov, target_fov, 5.0 * delta)
+
+    # ... 이동 코드에서 current_speed 사용 ...</code></pre>
+        <div class="tip">
+          <strong>Tip:</strong> 스태미나가 0이 되면 일정 시간(예: 2초) 스프린트를 사용하지 못하게 쿨다운을 추가하면 무한 토글을 방지할 수 있습니다.
+        </div>
+      </section>
+
+      <!-- Slide 11: 웅크리기 (Crouch) -->
+      <section data-narration="웅크리기는 충돌 형태의 높이를 줄이고 카메라 위치를 낮추는 기능입니다. 핵심은 천장이 있을 때 다시 일어서지 못하도록 RayCast3D로 머리 위 공간을 검사하는 것입니다. 충돌 형태를 직접 수정하면 물리 엔진이 자연스럽게 처리하며, 카메라 높이는 lerp로 부드럽게 전환하면 멀미를 방지할 수 있습니다.">
+        <h2>웅크리기 (Crouch)</h2>
+        <p><span class="badge badge-blue">기능</span> 충돌 형태 축소 + 카메라 높이 변경</p>
+        <pre><code class="language-gdscript">@export var stand_height: float = 1.8
+@export var crouch_height: float = 1.0
+@export var stand_camera_y: float = 1.6
+@export var crouch_camera_y: float = 0.8
+@export var crouch_speed: float = 2.5
+
+@onready var collision: CollisionShape3D = $CollisionShape3D
+@onready var camera_pivot: Node3D = $CameraPivot
+@onready var head_check: RayCast3D = $HeadCheck  # 위쪽으로 쏘는 레이
+
+var is_crouching: bool = false
+
+func _physics_process(delta: float):
+    # 웅크리기 입력
+    var wants_crouch = Input.is_action_pressed("crouch")
+
+    if wants_crouch and not is_crouching:
+        start_crouch()
+    elif not wants_crouch and is_crouching:
+        # 머리 위에 공간이 있는지 확인
+        if not head_check.is_colliding():
+            end_crouch()
+
+    # 카메라 높이 부드러운 전환
+    var target_y = crouch_camera_y if is_crouching else stand_camera_y
+    camera_pivot.position.y = lerp(camera_pivot.position.y, target_y, 10.0 * delta)
+
+func start_crouch():
+    is_crouching = true
+    var shape = collision.shape as CapsuleShape3D
+    shape.height = crouch_height
+    collision.position.y = crouch_height / 2.0
+
+func end_crouch():
+    is_crouching = false
+    var shape = collision.shape as CapsuleShape3D
+    shape.height = stand_height
+    collision.position.y = stand_height / 2.0</code></pre>
+        <div class="warning">
+          <strong>주의:</strong> HeadCheck RayCast3D는 위쪽(Vector3.UP)을 향하게 설정하고 target_position을 (0, stand_height - crouch_height, 0) 정도로 지정합니다. 반드시 enabled = true로 설정하세요.
+        </div>
+      </section>
+
+      <!-- Slide 12: TPS 컨트롤러 개요 -->
+      <section data-narration="TPS, 즉 3인칭 시점 컨트롤러는 카메라가 캐릭터 뒤에서 따라가는 구조입니다. FPS와 동일한 피봇 구조를 사용하되, SpringArm3D로 카메라를 일정 거리 뒤에 배치합니다. TPS에서는 캐릭터 모델이 보이므로 메시와 애니메이션이 중요하고, 카메라 방향과 캐릭터 이동 방향이 독립적이어서 회전 처리가 추가로 필요합니다.">
+        <h2>TPS 컨트롤러 개요</h2>
+        <p><span class="badge badge-blue">3인칭</span> 캐릭터 뒤에서 따라가는 카메라</p>
+        <div class="two-columns">
+          <div>
+            <h3 style="color: var(--gd-green);">TPS 씬 트리</h3>
+            <pre><code class="language-gdscript"># Player (CharacterBody3D)
+#  +-- CollisionShape3D
+#  +-- PlayerModel (Node3D)   -- 메시+애니
+#  |   +-- AnimationPlayer
+#  |   +-- MeshInstance3D / 임포트 모델
+#  +-- CameraPivot (Node3D)
+#  |   +-- SpringArm3D
+#  |       spring_length = 4.0
+#  |       +-- Camera3D
+#  +-- RayCast3D</code></pre>
+            <div class="tip">
+              <strong>Tip:</strong> PlayerModel을 별도 Node3D로 감싸면, 카메라 회전과 캐릭터 모델 회전을 독립적으로 제어할 수 있습니다.
+            </div>
+          </div>
+          <div>
+            <h3 style="color: var(--gd-blue);">FPS vs TPS 비교</h3>
+            <table class="compare-table">
+              <tr>
+                <th>항목</th>
+                <th>FPS</th>
+                <th>TPS</th>
+              </tr>
+              <tr>
+                <td>카메라 위치</td>
+                <td>눈 높이</td>
+                <td>뒤+위</td>
+              </tr>
+              <tr>
+                <td>캐릭터 모델</td>
+                <td>팔만 보임</td>
+                <td>전신 보임</td>
+              </tr>
+              <tr>
+                <td>캐릭터 회전</td>
+                <td>카메라와 동일</td>
+                <td>이동 방향으로 회전</td>
+              </tr>
+              <tr>
+                <td>벽 충돌</td>
+                <td>없음</td>
+                <td>SpringArm3D 필요</td>
+              </tr>
+              <tr>
+                <td>시야</td>
+                <td>좁음 (몰입감)</td>
+                <td>넓음 (공간 인식)</td>
+              </tr>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 13: SpringArm3D와 카메라 충돌 회피 -->
+      <section data-narration="SpringArm3D는 TPS 카메라에서 벽이나 오브젝트가 카메라와 캐릭터 사이에 끼면 자동으로 카메라를 당겨주는 노드입니다. spring_length로 최대 거리를, collision_mask로 어떤 레이어의 오브젝트에 반응할지 설정합니다. margin을 약간 주면 벽에 완전히 붙지 않아 화면 잘림을 방지할 수 있습니다.">
+        <h2>SpringArm3D 카메라 충돌 회피</h2>
+        <p>벽이나 오브젝트 사이에서 자동으로 카메라 거리 조절</p>
+        <pre><code class="language-gdscript">@onready var spring_arm: SpringArm3D = $CameraPivot/SpringArm3D
+
+func _ready():
+    Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+
+    # SpringArm3D 설정
+    spring_arm.spring_length = 4.0     # 기본 카메라 거리
+    spring_arm.collision_mask = 1       # 충돌 감지할 레이어
+    spring_arm.margin = 0.2            # 벽에서의 여유 거리
+
+    # SpringArm3D는 위치가 아닌 길이가 줄어듦
+    # 장애물이 없으면 spring_length 유지
+    # 장애물이 있으면 자동으로 줄어듦</code></pre>
+        <div class="two-columns">
+          <div>
+            <h3 style="color: var(--gd-green);">줌 인/아웃</h3>
+            <pre><code class="language-gdscript">@export var min_zoom: float = 1.5
+@export var max_zoom: float = 8.0
+@export var zoom_step: float = 0.5
+
+func _unhandled_input(event: InputEvent):
+    if event is InputEventMouseButton:
+        # 마우스 휠로 줌
+        if event.button_index == MOUSE_BUTTON_WHEEL_UP:
+            spring_arm.spring_length = max(
+                min_zoom,
+                spring_arm.spring_length - zoom_step
+            )
+        elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+            spring_arm.spring_length = min(
+                max_zoom,
+                spring_arm.spring_length + zoom_step
+            )</code></pre>
+          </div>
+          <div>
+            <div class="key-point">
+              <h3>SpringArm3D 주요 속성</h3>
+              <ul>
+                <li><strong>spring_length</strong> - 최대 팔 길이 (카메라 거리)</li>
+                <li><strong>collision_mask</strong> - 감지할 충돌 레이어</li>
+                <li><strong>margin</strong> - 충돌 시 여유 거리</li>
+                <li><strong>shape</strong> - 레이 대신 형태로 감지 (선택)</li>
+              </ul>
+            </div>
+            <div class="warning">
+              <strong>주의:</strong> collision_mask에서 플레이어 자신의 레이어는 반드시 제외하세요. 그렇지 않으면 카메라가 계속 플레이어에 충돌합니다.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 14: TPS 이동 (카메라 기준 방향) -->
+      <section data-narration="TPS에서 이동 방향은 카메라가 바라보는 방향을 기준으로 계산합니다. W키를 누르면 카메라가 향하는 방향으로 이동해야 합니다. 카메라 피봇의 전방 벡터와 우측 벡터를 구하되 Y성분을 0으로 만들어 수평면에서만 이동하도록 합니다. 이렇게 해야 카메라가 아래를 향해도 캐릭터가 땅속으로 이동하지 않습니다.">
+        <h2>TPS 이동 (카메라 기준 방향)</h2>
+        <p><span class="badge badge-green">핵심</span> 카메라 방향을 기준으로 수평 이동</p>
+        <pre><code class="language-gdscript">@onready var camera_pivot: Node3D = $CameraPivot
+
+@export var speed: float = 5.0
+
+func _physics_process(delta: float):
+    # 중력
+    if not is_on_floor():
+        velocity.y -= gravity * delta
+
+    # 점프
+    if Input.is_action_just_pressed("jump") and is_on_floor():
+        velocity.y = jump_velocity
+
+    # 입력 벡터
+    var input_dir := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
+
+    # 카메라 피봇의 수평 방향 벡터 구하기
+    var cam_basis := camera_pivot.global_transform.basis
+    var forward := -cam_basis.z  # 카메라 전방
+    var right := cam_basis.x      # 카메라 우측
+
+    # Y 성분 제거 후 정규화 (수평 이동만)
+    forward.y = 0.0
+    right.y = 0.0
+    forward = forward.normalized()
+    right = right.normalized()
+
+    # 최종 이동 방향
+    var direction := (forward * -input_dir.y + right * input_dir.x).normalized()
+
+    if direction:
+        velocity.x = direction.x * speed
+        velocity.z = direction.z * speed
+    else:
+        velocity.x = move_toward(velocity.x, 0.0, speed)
+        velocity.z = move_toward(velocity.z, 0.0, speed)
+
+    move_and_slide()</code></pre>
+        <div class="tip">
+          <strong>Tip:</strong> input_dir.y에 마이너스를 곱하는 이유는 Input.get_vector에서 forward가 음수 Y로 반환되기 때문입니다. 카메라의 -Z(전방)와 맞추기 위한 부호 보정입니다.
+        </div>
+      </section>
+
+      <!-- Slide 15: 캐릭터 회전 (look_at / lerp_angle) -->
+      <section data-narration="TPS에서 캐릭터 모델은 이동 방향을 향해 회전해야 합니다. look_at 함수를 사용하면 즉시 해당 방향을 바라보지만 뚝뚝 끊기게 됩니다. lerp_angle 함수로 현재 각도에서 목표 각도로 부드럽게 보간하면 자연스러운 회전이 됩니다. atan2 함수로 이동 방향 벡터를 각도로 변환하는 방법을 확실히 이해해두세요.">
+        <h2>캐릭터 회전 (look_at / lerp_angle)</h2>
+        <p>이동 방향으로 캐릭터 모델을 부드럽게 회전</p>
+        <div class="two-columns">
+          <div>
+            <h3 style="color: var(--gd-red);">즉시 회전 (look_at)</h3>
+            <pre><code class="language-gdscript">@onready var model: Node3D = $PlayerModel
+
+func update_rotation(direction: Vector3):
+    if direction.length() > 0.1:
+        # 즉시 회전 - 뚝뚝 끊김
+        var target_pos = (
+            model.global_position + direction
+        )
+        model.look_at(target_pos, Vector3.UP)
+    # look_at 주의: -Z가 정면 기준</code></pre>
+          </div>
+          <div>
+            <h3 style="color: var(--gd-green);">부드러운 회전 (lerp_angle)</h3>
+            <pre><code class="language-gdscript">@export var rotation_speed: float = 10.0
+@onready var model: Node3D = $PlayerModel
+
+func update_rotation(
+    direction: Vector3, delta: float
+):
+    if direction.length() > 0.1:
+        # 목표 각도 계산
+        var target_angle = atan2(
+            direction.x, direction.z
+        )
+        # 부드러운 보간
+        model.rotation.y = lerp_angle(
+            model.rotation.y,
+            target_angle,
+            rotation_speed * delta
+        )</code></pre>
+          </div>
+        </div>
+        <pre><code class="language-gdscript"># 완성된 TPS 회전 코드 (physics_process 내부)
+func _physics_process(delta: float):
+    # ... 이동 코드로 direction 계산 ...
+
+    if direction:
+        velocity.x = direction.x * speed
+        velocity.z = direction.z * speed
+
+        # 캐릭터 모델만 이동 방향으로 부드럽게 회전
+        var target_angle = atan2(direction.x, direction.z)
+        model.rotation.y = lerp_angle(model.rotation.y, target_angle, rotation_speed * delta)
+    else:
+        velocity.x = move_toward(velocity.x, 0.0, speed)
+        velocity.z = move_toward(velocity.z, 0.0, speed)
+
+    move_and_slide()</code></pre>
+      </section>
+
+      <!-- Slide 16: 계단 오르기 (Step Up) -->
+      <section data-narration="CharacterBody3D의 move_and_slide는 기본적으로 계단 같은 작은 턱을 넘지 못합니다. 계단 오르기를 구현하려면 레이캐스트로 전방에 턱이 있는지 감지하고, 위로 이동한 후 전진하고 다시 아래로 내려놓는 방식을 사용합니다. 이 기법은 스텝 오프셋이라고도 불리며, 많은 3D 게임에서 사용하는 필수 기능입니다.">
+        <h2>계단 오르기 (Step Up)</h2>
+        <p><span class="badge badge-orange">고급</span> 작은 턱과 계단을 부드럽게 오르기</p>
+        <pre><code class="language-gdscript">@export var max_step_height: float = 0.3  # 최대 오를 수 있는 턱 높이
+
+func step_up_stairs(delta: float):
+    if velocity.length() &lt; 0.1 or not is_on_floor():
+        return
+
+    var motion = velocity * delta
+    var step_up = Vector3.UP * max_step_height
+
+    # 1단계: 위로 이동 테스트
+    var up_result = PhysicsTestMotionResult3D.new()
+    var up_params = PhysicsTestMotionParameters3D.new()
+    up_params.from = global_transform
+    up_params.motion = step_up
+
+    if PhysicsServer3D.body_test_motion(get_rid(), up_params, up_result):
+        return  # 위에 공간이 없으면 중단
+
+    # 2단계: 위에서 전진 테스트
+    var raised_transform = global_transform
+    raised_transform.origin += step_up
+    var fwd_params = PhysicsTestMotionParameters3D.new()
+    fwd_params.from = raised_transform
+    fwd_params.motion = motion
+
+    if not PhysicsServer3D.body_test_motion(get_rid(), fwd_params):
+        # 3단계: 아래로 스냅
+        var fwd_transform = raised_transform
+        fwd_transform.origin += motion
+        var down_params = PhysicsTestMotionParameters3D.new()
+        down_params.from = fwd_transform
+        down_params.motion = -step_up
+        var down_result = PhysicsTestMotionResult3D.new()
+
+        if PhysicsServer3D.body_test_motion(get_rid(), down_params, down_result):
+            global_transform.origin = fwd_transform.origin + down_result.get_travel()
+</code></pre>
+        <div class="tip">
+          <strong>Tip:</strong> max_step_height를 0.25~0.4 사이로 설정하면 일반적인 게임 계단에 적합합니다. 너무 크면 높은 턱을 비정상적으로 오르게 됩니다.
+        </div>
+      </section>
+
+      <!-- Slide 17: 경사면 처리 -->
+      <section data-narration="CharacterBody3D의 floor_max_angle 속성은 캐릭터가 올라갈 수 있는 최대 경사각을 라디안 단위로 지정합니다. 기본값은 약 45도이며, 이보다 가파른 경사면에서는 미끄러집니다. slide_on_ceiling과 floor_snap_length를 적절히 설정하면 경사면에서의 이동이 매끄러워집니다. 급경사에서 미끄러지는 효과를 추가하면 더 현실적입니다.">
+        <h2>경사면 처리</h2>
+        <p>floor_max_angle과 슬라이딩으로 자연스러운 경사 이동</p>
+        <pre><code class="language-gdscript">extends CharacterBody3D
+
+func _ready():
+    # 경사면 관련 CharacterBody3D 설정
+    floor_max_angle = deg_to_rad(45)   # 최대 오를 수 있는 경사 (45도)
+    floor_snap_length = 0.5             # 경사면에 붙어있는 힘
+    floor_stop_on_slope = true          # 경사면에서 멈출 때 미끄러지지 않음
+    floor_block_on_wall = true          # 벽에 부딪히면 정지
+
+@export var slide_speed: float = 3.0
+
+func _physics_process(delta: float):
+    # ... 기본 이동 코드 ...
+
+    # 급경사 미끄러짐 구현
+    if is_on_floor():
+        var floor_normal = get_floor_normal()
+        var floor_angle = floor_normal.angle_to(Vector3.UP)
+
+        # 최대 경사각 초과 시 미끄러짐
+        if floor_angle > floor_max_angle:
+            # 경사면 아래 방향 계산
+            var slide_dir = Vector3(floor_normal.x, 0, floor_normal.z).normalized()
+            velocity += slide_dir * slide_speed * delta
+
+    move_and_slide()</code></pre>
+        <table class="compare-table">
+          <tr>
+            <th>속성</th>
+            <th>기본값</th>
+            <th>설명</th>
+          </tr>
+          <tr>
+            <td><code>floor_max_angle</code></td>
+            <td>0.785 (45도)</td>
+            <td>이 각도 이하의 경사면을 바닥으로 인식</td>
+          </tr>
+          <tr>
+            <td><code>floor_snap_length</code></td>
+            <td>0.1</td>
+            <td>바닥에 달라붙는 스냅 거리</td>
+          </tr>
+          <tr>
+            <td><code>floor_stop_on_slope</code></td>
+            <td>true</td>
+            <td>정지 시 경사면에서 미끄러지지 않음</td>
+          </tr>
+          <tr>
+            <td><code>wall_min_slide_angle</code></td>
+            <td>0.262 (15도)</td>
+            <td>벽 슬라이딩 최소 각도</td>
+          </tr>
+        </table>
+      </section>
+
+      <!-- Slide 18: 벽 슬라이딩 -->
+      <section data-narration="벽 슬라이딩은 캐릭터가 벽에 부딪혔을 때 완전히 멈추지 않고 벽을 따라 미끄러지는 동작입니다. move_and_slide가 기본적으로 슬라이딩을 처리하지만, 벽에 달라붙어 천천히 내려오는 월 슬라이드 기능을 추가하면 플랫포머 스타일의 벽 점프도 구현할 수 있습니다. is_on_wall과 get_wall_normal을 활용합니다.">
+        <h2>벽 슬라이딩</h2>
+        <p><span class="badge badge-blue">기능</span> 벽에 붙어 미끄러지기 + 벽 점프</p>
+        <pre><code class="language-gdscript">@export var wall_slide_gravity: float = 2.0    # 벽 슬라이드 시 감소된 중력
+@export var wall_jump_force: float = 6.0        # 벽 점프 수직 속도
+@export var wall_jump_horizontal: float = 4.0   # 벽 점프 수평 속도
+
+var is_wall_sliding: bool = false
+
+func _physics_process(delta: float):
+    # 벽 슬라이딩 판정
+    is_wall_sliding = (is_on_wall_only()
+        and not is_on_floor()
+        and velocity.y &lt; 0.0)
+
+    # 중력 적용 (벽 슬라이딩 시 감소)
+    if not is_on_floor():
+        if is_wall_sliding:
+            velocity.y = max(velocity.y, -wall_slide_gravity)
+        else:
+            velocity.y -= gravity * delta
+
+    # 벽 점프
+    if Input.is_action_just_pressed("jump"):
+        if is_on_floor():
+            velocity.y = jump_velocity
+        elif is_wall_sliding:
+            # 벽 반대 방향으로 튕겨나감
+            var wall_normal = get_wall_normal()
+            velocity.y = wall_jump_force
+            velocity.x = wall_normal.x * wall_jump_horizontal
+            velocity.z = wall_normal.z * wall_jump_horizontal
+            is_wall_sliding = false
+
+    # ... 이동 코드 ...
+    move_and_slide()</code></pre>
+        <div class="key-point">
+          <h3>벽 관련 함수</h3>
+          <ul>
+            <li><strong>is_on_wall()</strong> - 벽에 접촉 중 (바닥도 가능)</li>
+            <li><strong>is_on_wall_only()</strong> - 벽에만 접촉 (바닥 아님)</li>
+            <li><strong>get_wall_normal()</strong> - 접촉한 벽의 법선 벡터</li>
+            <li><strong>get_slide_collision()</strong> - 충돌 정보 상세 확인</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- Slide 19: 완성된 FPS 컨트롤러 전체 코드 -->
+      <section data-narration="지금까지 배운 모든 기능을 하나의 완성된 FPS 컨트롤러 스크립트로 통합합니다. 마우스 캡처, 마우스 룩, WASD 가속 이동, 중력과 점프, 스프린트, 웅크리기까지 포함된 실전용 코드입니다. 이 스크립트를 기반으로 여러분의 프로젝트에 맞게 값을 조절하고 기능을 추가하면 됩니다. 변수 이름과 구조를 이해하고 넘어가세요.">
+        <h2>완성된 FPS 컨트롤러 전체 코드</h2>
+        <p><span class="badge badge-green">실전</span> 모든 기능을 통합한 최종 스크립트</p>
+        <pre><code class="language-gdscript">extends CharacterBody3D
+
+# --- 노드 참조 ---
+@onready var camera_pivot: Node3D = $CameraPivot
+@onready var camera: Camera3D = $CameraPivot/Camera3D
+@onready var collision: CollisionShape3D = $CollisionShape3D
+@onready var head_check: RayCast3D = $HeadCheck
+
+# --- 이동 ---
+@export_group("Movement")
+@export var walk_speed: float = 5.0
+@export var sprint_speed: float = 8.5
+@export var crouch_speed: float = 2.5
+@export var acceleration: float = 10.0
+@export var deceleration: float = 8.0
+@export var air_control: float = 0.3
+
+# --- 점프 ---
+@export_group("Jump")
+@export var jump_velocity: float = 4.5
+@export var coyote_time: float = 0.15
+
+# --- 카메라 ---
+@export_group("Camera")
+@export var mouse_sensitivity: float = 0.002
+@export var normal_fov: float = 75.0
+@export var sprint_fov: float = 85.0
+
+# --- 상태 ---
+var gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
+var coyote_timer: float = 0.0
+var is_sprinting: bool = false
+var is_crouching: bool = false
+
+func _ready():
+    Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+
+func _unhandled_input(event: InputEvent):
+    # 마우스 룩
+    if event is InputEventMouseMotion:
+        if Input.get_mouse_mode() == Input.MOUSE_MODE_CAPTURED:
+            rotate_y(-event.relative.x * mouse_sensitivity)
+            camera_pivot.rotate_x(-event.relative.y * mouse_sensitivity)
+            camera_pivot.rotation.x = clamp(
+                camera_pivot.rotation.x, deg_to_rad(-89), deg_to_rad(89))
+    # ESC / 클릭 토글
+    if event.is_action_pressed("ui_cancel"):
+        Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+    elif event is InputEventMouseButton and event.pressed:
+        if Input.get_mouse_mode() == Input.MOUSE_MODE_VISIBLE:
+            Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+
+func _physics_process(delta: float):
+    # 중력 + 코요테 타임
+    if not is_on_floor():
+        velocity.y -= gravity * delta
+        coyote_timer -= delta
+    else:
+        coyote_timer = coyote_time
+    # 점프
+    if Input.is_action_just_pressed("jump"):
+        if is_on_floor() or coyote_timer > 0.0:
+            velocity.y = jump_velocity
+            coyote_timer = 0.0
+    # 스프린트 / 웅크리기 판정
+    is_sprinting = Input.is_action_pressed("sprint") and not is_crouching
+    handle_crouch(delta)
+    # 속도 결정
+    var current_speed = sprint_speed if is_sprinting else (
+        crouch_speed if is_crouching else walk_speed)
+    # 방향 계산
+    var input_dir := Input.get_vector(
+        "move_left", "move_right", "move_forward", "move_back")
+    var direction := (transform.basis * Vector3(
+        input_dir.x, 0, input_dir.y)).normalized()
+    # 가속/감속
+    var accel = acceleration if is_on_floor() else acceleration * air_control
+    if direction:
+        velocity.x = lerp(velocity.x, direction.x * current_speed, accel * delta)
+        velocity.z = lerp(velocity.z, direction.z * current_speed, accel * delta)
+    else:
+        velocity.x = lerp(velocity.x, 0.0, deceleration * delta)
+        velocity.z = lerp(velocity.z, 0.0, deceleration * delta)
+    # FOV
+    var target_fov = sprint_fov if is_sprinting else normal_fov
+    camera.fov = lerp(camera.fov, target_fov, 5.0 * delta)
+    move_and_slide()
+
+func handle_crouch(delta: float):
+    var wants_crouch = Input.is_action_pressed("crouch")
+    if wants_crouch and not is_crouching:
+        is_crouching = true
+        (collision.shape as CapsuleShape3D).height = 1.0
+        collision.position.y = 0.5
+    elif not wants_crouch and is_crouching and not head_check.is_colliding():
+        is_crouching = false
+        (collision.shape as CapsuleShape3D).height = 1.8
+        collision.position.y = 0.9
+    var target_y = 0.8 if is_crouching else 1.6
+    camera_pivot.position.y = lerp(camera_pivot.position.y, target_y, 10.0 * delta)</code></pre>
+      </section>
+
+      <!-- Slide 20: 정리 및 다음 챕터 -->
+      <section data-narration="이번 챕터에서는 3D 캐릭터 컨트롤러의 모든 핵심 요소를 학습했습니다. 마우스 캡처와 룩, 피봇 기반 카메라 구조, 방향 벡터 변환 이동, 가속 감속, 스프린트, 웅크리기, 그리고 계단과 경사면 처리까지 실전에 바로 적용할 수 있는 내용들입니다. 다음 챕터에서는 3D 월드를 아름답게 꾸미는 환경과 조명을 배웁니다.">
+        <h2>Chapter 15 정리</h2>
+        <div class="key-point">
+          <h3>핵심 요약</h3>
+          <table class="compare-table">
+            <tr>
+              <th>주제</th>
+              <th>핵심 내용</th>
+            </tr>
+            <tr>
+              <td>마우스 캡처</td>
+              <td><code>Input.MOUSE_MODE_CAPTURED</code>로 고정, ESC로 해제</td>
+            </tr>
+            <tr>
+              <td>마우스 룩</td>
+              <td>루트=Y축 회전, 피봇=X축 회전, clamp로 제한</td>
+            </tr>
+            <tr>
+              <td>이동</td>
+              <td><code>transform.basis</code>로 방향 변환, lerp/move_toward 가감속</td>
+            </tr>
+            <tr>
+              <td>점프</td>
+              <td>중력 누적, 코요테 타임, 하강 중력 증가</td>
+            </tr>
+            <tr>
+              <td>스프린트/웅크리기</td>
+              <td>속도 배수, FOV 변화, 충돌 형태 변경, 머리 검사</td>
+            </tr>
+            <tr>
+              <td>TPS</td>
+              <td>SpringArm3D, 카메라 기준 이동, lerp_angle 회전</td>
+            </tr>
+            <tr>
+              <td>지형 처리</td>
+              <td>step_up 계단, floor_max_angle 경사, 벽 슬라이딩</td>
+            </tr>
+          </table>
+        </div>
+        <div class="tip">
+          <strong>실습 과제:</strong> 이번 챕터의 FPS 컨트롤러 코드를 직접 입력하고, sprint_speed와 mouse_sensitivity 값을 바꿔가며 최적의 조작감을 찾아보세요. TPS 컨트롤러도 직접 만들어보면 이해가 깊어집니다.
+        </div>
+      </section>
+
+      <!-- Slide 21 (end): Complete -->
+      <section class="chapter-title" data-transition="zoom" data-narration="챕터 15 3D 캐릭터 컨트롤러를 마치겠습니다. FPS와 TPS의 핵심 구조를 모두 학습했으니 이제 자신만의 컨트롤러를 만들 수 있습니다. 다음 챕터에서는 3D 환경과 조명을 다룹니다. WorldEnvironment, 하늘, 안개, 글로우, 그리고 다양한 조명 노드를 배워 여러분의 3D 월드를 아름답게 만들어봅시다.">
+        <span class="chapter-number">Next</span>
+        <h1>수고하셨습니다!</h1>
+        <br>
+        <p><a href="16-3d-environment.html" style="color: var(--gd-blue); font-size: 1.2em;">다음 챕터: 3D 환경과 조명 &#8594;</a></p>
+        <br>
+        <p><a href="../index.html" style="color: #888; font-size: 0.7em;">&#8592; 목차로 돌아가기</a></p>
+      </section>
+
+    </div>
+  </div>
+  <div class="nav-footer"><a href="../index.html" style="color: #888;">Godot 초보부터 고수까지</a> | Chapter 15</div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/plugin/highlight/highlight.min.js"></script>
+  <script>
+    Reveal.initialize({ hash: true, slideNumber: true, plugins: [RevealHighlight], transition: 'slide', height: 700, center: false, margin: 0.04, minScale: 0.2, maxScale: 1.5, keyboard: { 38: null, 40: null }, mouseWheel: false });
+    document.addEventListener('keydown', function(e) { if (e.keyCode === 38 || e.keyCode === 40) { var slide = Reveal.getCurrentSlide(); if (!slide) return; var amount = 80; if (e.keyCode === 38) { slide.scrollTop -= amount; } else { slide.scrollTop += amount; } e.preventDefault(); e.stopPropagation(); } }, true);
+  </script>
+  <script src="js/narration.js"></script>
+</body>
+</html>

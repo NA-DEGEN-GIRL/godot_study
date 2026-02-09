@@ -1,0 +1,1295 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 18: 3D 애니메이션 - Godot 초보부터 고수까지</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/theme/night.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/plugin/highlight/monokai.min.css">
+  <link rel="stylesheet" href="css/custom.css">
+  <link rel="stylesheet" href="css/narration.css">
+</head>
+<body>
+  <div class="reveal">
+    <div class="slides">
+
+      <!-- Slide 1: Title -->
+      <section class="chapter-title" data-transition="zoom" data-narration="챕터 18에 오신 것을 환영합니다. 이번 챕터에서는 3D 캐릭터와 오브젝트에 생명을 불어넣는 애니메이션 기술을 다룹니다. 3D 모델 임포트부터 스켈레탈 애니메이션, AnimationTree를 활용한 블렌딩, IK, 절차적 애니메이션, Tween 활용, 그리고 실전 캐릭터 애니메이션 시스템 구축까지 폭넓게 학습합니다. 움직이는 3D 세계를 만들어 봅시다.">
+        <span class="chapter-number">Chapter 18</span>
+        <h1>3D 애니메이션</h1>
+        <p class="subtitle">모델 임포트, 스켈레탈 애니메이션, AnimationTree, IK, Tween</p>
+        <br>
+        <p><a href="../index.html" style="color: #888; font-size: 0.6em;">&#8592; 목차로 돌아가기</a></p>
+      </section>
+
+      <!-- Slide 2: 3D 모델 임포트 (glTF/FBX/OBJ) -->
+      <section data-narration="3D 게임에서 캐릭터와 환경 모델은 대부분 외부 툴에서 만들어 Godot으로 임포트합니다. Godot 4는 glTF 2.0을 공식 권장 포맷으로 지원하며, FBX와 OBJ도 사용할 수 있습니다. glTF는 메시, 머티리얼, 애니메이션, 스켈레톤을 모두 포함할 수 있고 오픈 표준이라 호환성이 가장 좋습니다. 모델 파일을 프로젝트 폴더에 넣으면 자동으로 임포트됩니다.">
+        <h2>3D 모델 임포트</h2>
+        <p>외부 3D 모델링 툴에서 만든 에셋을 Godot으로 가져오기</p>
+        <table class="compare-table">
+          <tr>
+            <th>포맷</th>
+            <th>확장자</th>
+            <th>장점</th>
+            <th>단점</th>
+          </tr>
+          <tr>
+            <td><span class="badge badge-green">glTF 2.0 (권장)</span></td>
+            <td>.gltf / .glb</td>
+            <td>오픈 표준, 메시+애니메이션+스켈레톤 포함, PBR 지원</td>
+            <td>일부 복잡한 리깅 제한</td>
+          </tr>
+          <tr>
+            <td><span class="badge badge-blue">FBX</span></td>
+            <td>.fbx</td>
+            <td>업계 표준, 복잡한 애니메이션 지원</td>
+            <td>독점 포맷, ufbx 라이브러리 필요</td>
+          </tr>
+          <tr>
+            <td><span class="badge badge-orange">OBJ</span></td>
+            <td>.obj / .mtl</td>
+            <td>단순, 널리 지원</td>
+            <td>애니메이션/스켈레톤 미지원</td>
+          </tr>
+          <tr>
+            <td><span class="badge badge-blue">Blend</span></td>
+            <td>.blend</td>
+            <td>Blender 직접 임포트 (Blender 설치 필요)</td>
+            <td>Blender가 시스템에 설치되어 있어야 함</td>
+          </tr>
+        </table>
+        <div class="two-columns">
+          <div>
+            <div class="key-point">
+              <h3>임포트 절차</h3>
+              <ol>
+                <li>3D 모델 파일을 <code>res://assets/models/</code>에 배치</li>
+                <li>Godot이 자동으로 .import 파일 생성</li>
+                <li>FileSystem 독에서 더블 클릭하여 씬으로 열기</li>
+                <li>필요시 임포트 설정 조정 후 Reimport</li>
+              </ol>
+            </div>
+          </div>
+          <div>
+            <pre><code class="language-gdscript"># 코드로 glTF 모델 로드
+func load_model():
+    var scene = preload(
+        "res://assets/models/character.glb"
+    )
+    var instance = scene.instantiate()
+    add_child(instance)
+    # 위치, 회전, 스케일 조정
+    instance.position = Vector3(0, 0, 0)
+    instance.rotation_degrees.y = 180
+    instance.scale = Vector3(1, 1, 1)
+
+# 런타임에 동적 로드
+func load_model_async():
+    var loader = ResourceLoader.load_threaded_request(
+        "res://assets/models/enemy.glb"
+    )
+    # ... 로딩 완료 후
+    var scene = ResourceLoader.load_threaded_get(
+        "res://assets/models/enemy.glb"
+    )</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 3: 임포트 설정 -->
+      <section data-narration="모델 임포트 설정은 품질과 성능에 직접 영향을 미칩니다. FileSystem 독에서 모델을 선택하면 Import 독에서 세부 옵션을 조절할 수 있습니다. 루트 노드 타입, 메시 압축, 애니메이션 분리, 머티리얼 처리 방식 등을 설정합니다. 특히 애니메이션 클립 분리는 하나의 타임라인에 여러 동작이 들어있을 때 구간을 나누어 개별 애니메이션으로 사용할 수 있게 합니다.">
+        <h2>임포트 설정</h2>
+        <p>Import 독에서 모델의 품질과 동작을 세밀하게 조정</p>
+        <div class="two-columns">
+          <div>
+            <div class="key-point">
+              <h3>주요 임포트 옵션</h3>
+              <table class="compare-table">
+                <tr>
+                  <th>카테고리</th>
+                  <th>옵션</th>
+                  <th>설명</th>
+                </tr>
+                <tr>
+                  <td>Root Type</td>
+                  <td>Node3D / 기타</td>
+                  <td>루트 노드 타입 지정</td>
+                </tr>
+                <tr>
+                  <td>Meshes</td>
+                  <td>Compress</td>
+                  <td>메시 데이터 압축 (VRAM 절약)</td>
+                </tr>
+                <tr>
+                  <td>Meshes</td>
+                  <td>Generate Lightmap UV</td>
+                  <td>라이트맵용 UV2 자동 생성</td>
+                </tr>
+                <tr>
+                  <td>Animation</td>
+                  <td>Import / Loop Mode</td>
+                  <td>애니메이션 포함 여부, 루프 설정</td>
+                </tr>
+                <tr>
+                  <td>Materials</td>
+                  <td>Extract / Keep on Reimport</td>
+                  <td>머티리얼 외부 파일로 분리</td>
+                </tr>
+              </table>
+            </div>
+          </div>
+          <div>
+            <h3>애니메이션 클립 분리</h3>
+            <pre><code class="language-gdscript"># 고급 임포트 스크립트 (.import 파일 수정)
+# 또는 에디터의 고급 임포트 설정에서:
+#
+# Animation &gt; Clips:
+#   clip_1:
+#     name: "idle"
+#     start_frame: 0
+#     end_frame: 60
+#     loop_mode: 1  # Loop
+#   clip_2:
+#     name: "walk"
+#     start_frame: 61
+#     end_frame: 90
+#     loop_mode: 1
+#   clip_3:
+#     name: "jump"
+#     start_frame: 91
+#     end_frame: 120
+#     loop_mode: 0  # No Loop
+
+# 임포트 후 애니메이션 확인
+func check_animations():
+    var anim_player = $Character/AnimationPlayer
+    var anim_list = anim_player.get_animation_list()
+    for anim_name in anim_list:
+        var anim = anim_player.get_animation(anim_name)
+        print("%s: %.1f초" % [anim_name, anim.length])</code></pre>
+            <div class="tip">
+              <strong>Tip:</strong> Blender에서 여러 Action을 NLA Track에 넣어 glTF로 내보내면, Godot에서 각 Action이 개별 애니메이션으로 자동 인식됩니다.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 4: Skeleton3D -->
+      <section data-narration="Skeleton3D는 3D 캐릭터의 뼈대 구조를 관리하는 노드입니다. 임포트된 모델에 리깅 정보가 있으면 자동으로 생성됩니다. 각 본은 인덱스로 접근하며, 트랜스폼을 읽거나 수정하여 포즈를 제어할 수 있습니다. 부모-자식 관계의 본 계층 구조가 자연스러운 관절 움직임을 만들어냅니다. 코드로 특정 본의 트랜스폼을 직접 제어할 수도 있습니다.">
+        <h2>Skeleton3D</h2>
+        <p><span class="badge badge-blue">뼈대</span> 3D 캐릭터의 본(Bone) 계층 구조</p>
+        <div class="two-columns">
+          <div>
+            <div class="key-point">
+              <h3>Skeleton3D 구조</h3>
+              <ul>
+                <li>본(Bone)들의 부모-자식 계층</li>
+                <li>각 본은 인덱스(int)로 식별</li>
+                <li>본 이름으로 인덱스 검색 가능</li>
+                <li>Rest Pose = 기본 포즈 (T-Pose 등)</li>
+                <li>각 본의 로컬/글로벌 트랜스폼 제어 가능</li>
+              </ul>
+            </div>
+            <pre><code class="language-gdscript"># 일반적인 인체 본 계층 구조
+# Root
+# └ Hips
+#   ├ Spine
+#   │ ├ Chest
+#   │ │ ├ Neck &gt; Head
+#   │ │ ├ LeftShoulder &gt; LeftArm &gt; LeftForeArm &gt; LeftHand
+#   │ │ └ RightShoulder &gt; RightArm &gt; RightForeArm &gt; RightHand
+#   ├ LeftUpLeg &gt; LeftLeg &gt; LeftFoot
+#   └ RightUpLeg &gt; RightLeg &gt; RightFoot</code></pre>
+          </div>
+          <div>
+            <pre><code class="language-gdscript"># Skeleton3D 코드 접근
+@onready var skeleton: Skeleton3D = (
+    $Character/Armature/Skeleton3D
+)
+
+func _ready():
+    # 본 개수 확인
+    print("본 개수: ", skeleton.get_bone_count())
+
+    # 본 이름으로 인덱스 검색
+    var head_idx = skeleton.find_bone("Head")
+    print("Head 인덱스: ", head_idx)
+
+    # 모든 본 이름 출력
+    for i in skeleton.get_bone_count():
+        var name = skeleton.get_bone_name(i)
+        var parent = skeleton.get_bone_parent(i)
+        print("  [%d] %s (부모: %d)" %
+            [i, name, parent])
+
+# 특정 본 트랜스폼 제어
+func look_at_target(target: Vector3):
+    var head_idx = skeleton.find_bone("Head")
+    var head_pose = skeleton.get_bone_pose(head_idx)
+
+    # 목표 방향으로 회전 계산
+    var direction = (
+        target - skeleton.to_global(head_pose.origin)
+    ).normalized()
+    # 본 포즈 오버라이드
+    skeleton.set_bone_pose_rotation(
+        head_idx,
+        Quaternion(
+            head_pose.basis.z, direction
+        )
+    )</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 5: BoneAttachment3D -->
+      <section data-narration="BoneAttachment3D는 특정 본에 3D 오브젝트를 부착하는 노드입니다. 캐릭터 손에 무기를 들게 하거나, 머리에 모자를 씌우거나, 등에 백팩을 달 때 사용합니다. BoneAttachment3D를 Skeleton3D의 자식으로 추가하고 대상 본을 지정하면, 해당 본이 움직일 때 부착된 오브젝트도 함께 따라갑니다. 장비 교체 시스템의 기반이 되는 핵심 기능입니다.">
+        <h2>BoneAttachment3D</h2>
+        <p><span class="badge badge-green">장착</span> 본에 오브젝트를 부착하여 함께 움직이기</p>
+        <div class="two-columns">
+          <div>
+            <div class="key-point">
+              <h3>활용 사례</h3>
+              <ul>
+                <li class="fragment">손에 무기(칼, 총, 방패) 장착</li>
+                <li class="fragment">머리에 모자, 헬멧, 헤어 악세서리</li>
+                <li class="fragment">등에 백팩, 날개, 망토</li>
+                <li class="fragment">파티클 이펙트를 특정 본에 부착</li>
+                <li class="fragment">카메라를 캐릭터 머리에 부착 (1인칭)</li>
+              </ul>
+            </div>
+            <pre><code class="language-gdscript"># 씬 트리 구조
+# Character (CharacterBody3D)
+# └ Armature
+#   └ Skeleton3D
+#     ├ MeshInstance3D (캐릭터 메시)
+#     ├ BoneAttachment3D  [bone: "RightHand"]
+#     │ └ Sword (MeshInstance3D)
+#     └ BoneAttachment3D  [bone: "Head"]
+#       └ Helmet (MeshInstance3D)</code></pre>
+          </div>
+          <div>
+            <pre><code class="language-gdscript"># BoneAttachment3D 코드 설정
+func setup_weapon_slot():
+    var attachment = BoneAttachment3D.new()
+    attachment.bone_name = "RightHand"
+
+    # Skeleton3D의 자식으로 추가
+    skeleton.add_child(attachment)
+
+    # 무기 메시 추가
+    var sword = preload(
+        "res://assets/models/sword.glb"
+    ).instantiate()
+    attachment.add_child(sword)
+
+    # 오프셋 조정 (손에 맞게)
+    sword.position = Vector3(0, 0.1, 0)
+    sword.rotation_degrees = Vector3(0, 0, -90)
+
+# 무기 교체 시스템
+var current_weapon: Node3D = null
+
+func equip_weapon(weapon_scene: PackedScene):
+    var slot = $Skeleton3D/RightHandAttachment
+
+    # 기존 무기 제거
+    if current_weapon:
+        current_weapon.queue_free()
+
+    # 새 무기 장착
+    current_weapon = weapon_scene.instantiate()
+    slot.add_child(current_weapon)
+
+func unequip_weapon():
+    if current_weapon:
+        current_weapon.queue_free()
+        current_weapon = null</code></pre>
+            <div class="tip">
+              <strong>Tip:</strong> 에디터에서 BoneAttachment3D를 선택하고 <code>bone_name</code> 속성의 드롭다운에서 원하는 본을 선택하면 됩니다. 오프셋은 부착된 자식 노드의 Transform으로 조절합니다.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 6: 스켈레탈 애니메이션 재생 -->
+      <section data-narration="임포트된 3D 모델의 스켈레탈 애니메이션은 AnimationPlayer를 통해 재생합니다. 모델에 포함된 애니메이션은 자동으로 AnimationPlayer에 등록되며, play 메서드로 이름을 지정하여 재생합니다. 애니메이션 속도, 블렌딩 시간, 재생 방향 등을 제어할 수 있습니다. 애니메이션 시그널을 활용하면 특정 시점에 이벤트를 발생시킬 수도 있습니다.">
+        <h2>스켈레탈 애니메이션 재생</h2>
+        <p>AnimationPlayer로 임포트된 본 애니메이션 제어</p>
+        <div class="two-columns">
+          <div>
+            <pre><code class="language-gdscript"># 기본 애니메이션 재생
+@onready var anim_player: AnimationPlayer = (
+    $Character/AnimationPlayer
+)
+
+func _ready():
+    # 사용 가능한 애니메이션 목록
+    print(anim_player.get_animation_list())
+    # 예: ["idle", "walk", "run", "jump", "attack"]
+
+    # 기본 애니메이션 재생
+    anim_player.play("idle")
+
+# 애니메이션 전환 (블렌딩)
+func play_animation(anim_name: String):
+    if anim_player.current_animation == anim_name:
+        return
+    # 0.2초 크로스페이드 전환
+    anim_player.play(anim_name, 0.2)
+
+# 속도 조절
+func play_slow_motion():
+    anim_player.play("attack")
+    anim_player.speed_scale = 0.5
+
+# 역재생
+func play_reverse():
+    anim_player.play_backwards("jump")</code></pre>
+          </div>
+          <div>
+            <pre><code class="language-gdscript"># 애니메이션 시그널 활용
+func _ready():
+    anim_player.animation_finished.connect(
+        _on_animation_finished
+    )
+
+func _on_animation_finished(anim_name: String):
+    match anim_name:
+        "attack":
+            play_animation("idle")
+        "jump":
+            play_animation("idle")
+        "death":
+            queue_free()
+
+# 애니메이션 트랙에 메서드 호출 키 추가
+# AnimationPlayer 에디터에서:
+# 1. Call Method Track 추가
+# 2. 원하는 프레임에 키 추가
+# 3. spawn_hitbox() 같은 메서드 지정
+func spawn_hitbox():
+    # 공격 애니메이션의 특정 프레임에서 호출
+    var hitbox = preload(
+        "res://scenes/attack_hitbox.tscn"
+    ).instantiate()
+    add_child(hitbox)
+
+func play_footstep_sound():
+    $FootstepAudioPlayer.play()</code></pre>
+            <div class="warning">
+              <strong>주의:</strong> <code>play()</code>의 두 번째 인자(blend)는 전환 시간입니다. 너무 짧으면 끊김이 보이고, 너무 길면 반응이 느려집니다. 0.1~0.3초가 일반적입니다.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 7: AnimationPlayer 3D -->
+      <section data-narration="AnimationPlayer는 3D에서도 다양한 속성을 애니메이션할 수 있습니다. 본 트랜스폼뿐만 아니라 머티리얼 파라미터, 노드 위치, 가시성, 셰이더 uniform 등 거의 모든 속성을 키프레임으로 제어할 수 있습니다. 에디터의 애니메이션 패널에서 속성 트랙을 추가하고 키를 찍거나, 코드로 Animation 리소스를 동적으로 생성할 수도 있습니다.">
+        <h2>AnimationPlayer 3D 활용</h2>
+        <p>본 외에도 다양한 3D 속성을 키프레임으로 애니메이션</p>
+        <div class="two-columns">
+          <div>
+            <div class="key-point">
+              <h3>애니메이션 가능한 3D 속성</h3>
+              <ul>
+                <li class="fragment"><strong>본 트랜스폼</strong> - 위치, 회전, 스케일</li>
+                <li class="fragment"><strong>노드 Transform</strong> - position, rotation</li>
+                <li class="fragment"><strong>머티리얼</strong> - albedo_color, emission</li>
+                <li class="fragment"><strong>셰이더 uniform</strong> - 커스텀 파라미터</li>
+                <li class="fragment"><strong>블렌드셰이프</strong> - 얼굴 표정 등</li>
+                <li class="fragment"><strong>가시성</strong> - visible, transparency</li>
+                <li class="fragment"><strong>메서드 호출</strong> - 특정 프레임에서 함수 실행</li>
+              </ul>
+            </div>
+          </div>
+          <div>
+            <pre><code class="language-gdscript"># 코드로 Animation 리소스 생성
+func create_door_animation():
+    var anim = Animation.new()
+    anim.length = 1.0
+    anim.loop_mode = Animation.LOOP_NONE
+
+    # 회전 트랙 추가
+    var track_idx = anim.add_track(
+        Animation.TYPE_VALUE
+    )
+    anim.track_set_path(
+        track_idx,
+        "Door:rotation_degrees:y"
+    )
+
+    # 키프레임 삽입
+    anim.track_insert_key(track_idx, 0.0, 0.0)
+    anim.track_insert_key(track_idx, 1.0, -90.0)
+
+    # 보간 모드 설정
+    anim.track_set_interpolation_type(
+        track_idx,
+        Animation.INTERPOLATION_CUBIC
+    )
+
+    # AnimationPlayer에 등록
+    var player = $AnimationPlayer
+    var lib = player.get_animation_library("")
+    lib.add_animation("open_door", anim)
+
+# 블렌드셰이프 애니메이션 (표정)
+func animate_face():
+    var anim_player = $AnimationPlayer
+    # 블렌드셰이프 트랙이 임포트 시 자동 생성
+    # "Smile", "Blink", "OpenMouth" 등
+    anim_player.play("smile_expression")</code></pre>
+          </div>
+        </div>
+        <div class="tip">
+          <strong>Tip:</strong> 에디터에서 AnimationPlayer를 선택하고 하단 패널의 Animation 탭에서 키 아이콘을 클릭하면 현재 선택된 노드의 속성에 키프레임을 바로 추가할 수 있습니다.
+        </div>
+      </section>
+
+      <!-- Slide 8: AnimationTree 3D (StateMachine/BlendTree) -->
+      <section data-narration="AnimationTree는 여러 애니메이션을 상태 머신이나 블렌드 트리로 조합하여 복잡한 동작 시스템을 구축하는 노드입니다. AnimationNodeStateMachine은 상태 간 전환을 정의하고, AnimationNodeBlendTree는 여러 애니메이션을 섞어 중간 동작을 만듭니다. 3D 캐릭터의 자연스러운 동작 전환에 필수적인 기능으로, 걷기에서 달리기로, 점프에서 착지로의 매끄러운 전환을 구현합니다.">
+        <h2>AnimationTree 3D</h2>
+        <p><span class="badge badge-blue">StateMachine</span> <span class="badge badge-green">BlendTree</span> 복잡한 동작 시스템 구축</p>
+        <div class="two-columns">
+          <div>
+            <h3>AnimationNodeStateMachine</h3>
+            <pre><code class="language-gdscript"># AnimationTree 설정 (씬 트리)
+# Character
+# ├ Skeleton3D
+# ├ AnimationPlayer
+# └ AnimationTree
+#     tree_root = AnimationNodeStateMachine
+#     anim_player = ../AnimationPlayer
+
+# 상태 머신 접근
+@onready var anim_tree: AnimationTree = (
+    $AnimationTree
+)
+@onready var state_machine: AnimationNodeStateMachinePlayback = (
+    anim_tree.get(
+        "parameters/playback"
+    )
+)
+
+func _ready():
+    anim_tree.active = true
+    state_machine.travel("idle")
+
+func _physics_process(delta: float):
+    var velocity = $CharacterBody3D.velocity
+    var speed = velocity.length()
+
+    if speed &gt; 0.1:
+        if speed &gt; 5.0:
+            state_machine.travel("run")
+        else:
+            state_machine.travel("walk")
+    else:
+        state_machine.travel("idle")</code></pre>
+          </div>
+          <div>
+            <h3>AnimationNodeBlendTree</h3>
+            <pre><code class="language-gdscript"># BlendTree로 상체/하체 분리 블렌딩
+# AnimationTree의 BlendTree 구성:
+#
+# [Animation: walk] --&gt;
+#                      [Blend2] --&gt; [Output]
+# [Animation: shoot] --&gt;
+#
+# Blend2의 blend_amount로 섞는 비율 조절
+
+# BlendTree 파라미터 제어
+func update_blend(is_shooting: bool):
+    # 파라미터 경로로 블렌드 양 설정
+    anim_tree.set(
+        "parameters/Blend2/blend_amount",
+        1.0 if is_shooting else 0.0
+    )
+
+# Add2 노드: 기본 + 추가 애니메이션
+# [Animation: run]  --&gt;
+#                     [Add2] --&gt; [Output]
+# [Animation: limp] --&gt;
+#
+# 달리기 + 절뚝거리기 합성
+func set_injury_amount(amount: float):
+    anim_tree.set(
+        "parameters/Add2/add_amount",
+        amount  # 0.0 ~ 1.0
+    )</code></pre>
+            <div class="key-point">
+              <h3>노드 타입 비교</h3>
+              <ul>
+                <li><strong>Blend2</strong> - 두 애니메이션 선형 보간</li>
+                <li><strong>Add2</strong> - 기본에 추가 동작 합성</li>
+                <li><strong>OneShot</strong> - 일회성 동작 삽입</li>
+                <li><strong>Transition</strong> - 조건부 전환</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 9: BlendSpace1D/2D 3D -->
+      <section data-narration="BlendSpace는 파라미터 값에 따라 여러 애니메이션을 자동으로 블렌딩하는 강력한 도구입니다. BlendSpace1D는 하나의 축(예: 속도)에 따라 걷기와 달리기를 자연스럽게 전환합니다. BlendSpace2D는 두 축(예: 전후 속도와 좌우 속도)을 사용하여 8방향 이동 블렌딩이 가능합니다. 3D 캐릭터의 이동 시스템에 거의 필수적으로 사용됩니다.">
+        <h2>BlendSpace1D / BlendSpace2D</h2>
+        <p><span class="badge badge-orange">블렌딩</span> 파라미터 기반 자동 애니메이션 보간</p>
+        <div class="two-columns">
+          <div>
+            <h3>BlendSpace1D (속도 기반)</h3>
+            <pre><code class="language-gdscript"># BlendSpace1D 구성:
+# 위치 -1.0: walk_backward
+# 위치  0.0: idle
+# 위치  0.5: walk
+# 위치  1.0: run
+#
+# 하나의 blend_position 값으로 자동 보간
+
+@onready var anim_tree: AnimationTree = (
+    $AnimationTree
+)
+
+func _physics_process(delta: float):
+    var speed = velocity.length()
+    var max_speed = 10.0
+
+    # 속도를 0~1로 정규화
+    var blend_pos = clampf(
+        speed / max_speed, 0.0, 1.0
+    )
+
+    anim_tree.set(
+        "parameters/BlendSpace1D/blend_position",
+        blend_pos
+    )</code></pre>
+          </div>
+          <div>
+            <h3>BlendSpace2D (방향 기반)</h3>
+            <pre><code class="language-gdscript"># BlendSpace2D 구성 (8방향):
+#         walk_forward (0, -1)
+#            /      \
+# walk_left       walk_right
+# (-1, 0)           (1, 0)
+#            \      /
+#        walk_backward (0, 1)
+# 중앙 (0, 0): idle
+
+func _physics_process(delta: float):
+    # 로컬 속도 계산 (캐릭터 기준)
+    var local_vel = (
+        global_transform.basis.inverse()
+        * velocity
+    )
+    var max_speed = 6.0
+
+    # X: 좌우, Y: 전후
+    var blend_x = clampf(
+        local_vel.x / max_speed, -1.0, 1.0
+    )
+    var blend_y = clampf(
+        -local_vel.z / max_speed, -1.0, 1.0
+    )
+
+    anim_tree.set(
+        "parameters/BlendSpace2D/blend_position",
+        Vector2(blend_x, blend_y)
+    )</code></pre>
+            <div class="tip">
+              <strong>Tip:</strong> BlendSpace2D 에디터에서 삼각형 자동 생성 버튼을 클릭하면 배치된 점들을 기반으로 블렌딩 영역이 자동 구성됩니다.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 10: 전환 조건 (travel/advance) -->
+      <section data-narration="StateMachine에서 상태 전환은 travel과 advance 두 가지 방식으로 제어합니다. travel은 현재 상태에서 목표 상태까지 정의된 전환 경로를 따라 자동으로 이동합니다. 전환 조건에는 즉시 전환, 애니메이션 종료 후 전환, 조건식 기반 전환 등이 있습니다. advance 조건을 활용하면 파라미터 값에 따라 자동 전환도 가능합니다.">
+        <h2>전환 조건 (Travel / Advance)</h2>
+        <p>StateMachine에서 상태 간 전환을 제어하는 방법</p>
+        <div class="two-columns">
+          <div>
+            <div class="key-point">
+              <h3>전환 모드</h3>
+              <table class="compare-table">
+                <tr>
+                  <th>모드</th>
+                  <th>동작</th>
+                </tr>
+                <tr>
+                  <td>Immediate</td>
+                  <td>즉시 전환 (크로스페이드)</td>
+                </tr>
+                <tr>
+                  <td>Sync</td>
+                  <td>동기화된 전환 (같은 프레임 비율 유지)</td>
+                </tr>
+                <tr>
+                  <td>At End</td>
+                  <td>현재 애니메이션 종료 후 전환</td>
+                </tr>
+              </table>
+            </div>
+            <pre><code class="language-gdscript"># travel: 경로를 따라 전환
+func _physics_process(delta: float):
+    var sm: AnimationNodeStateMachinePlayback = (
+        anim_tree.get("parameters/playback")
+    )
+
+    # 현재 상태 확인
+    var current = sm.get_current_node()
+    print("현재 상태: ", current)
+
+    # 목표 상태로 이동 (경로 자동 탐색)
+    if is_on_floor() and velocity.length() &gt; 0.1:
+        sm.travel("walk")
+    elif not is_on_floor():
+        sm.travel("fall")
+    else:
+        sm.travel("idle")</code></pre>
+          </div>
+          <div>
+            <pre><code class="language-gdscript"># Advance 조건 (자동 전환)
+# 에디터에서 전환 선에 조건 설정:
+# idle -&gt; walk: advance_condition = "is_moving"
+# walk -&gt; idle: advance_condition = "is_idle"
+# any -&gt; jump: advance_condition = "is_jumping"
+
+# 조건 파라미터 설정
+func update_conditions():
+    var speed = velocity.length()
+    anim_tree.set(
+        "parameters/conditions/is_moving",
+        speed &gt; 0.1
+    )
+    anim_tree.set(
+        "parameters/conditions/is_idle",
+        speed &lt;= 0.1
+    )
+    anim_tree.set(
+        "parameters/conditions/is_jumping",
+        not is_on_floor()
+    )
+
+# 전환 시간(xfade) 설정
+# 에디터에서 전환 선 클릭 후:
+# - Switch Mode: Immediate / Sync / At End
+# - Xfade Time: 0.2 (크로스페이드 시간)
+# - Advance Condition: 조건 이름
+# - Priority: 전환 우선순위</code></pre>
+            <div class="warning">
+              <strong>주의:</strong> <code>travel()</code>은 정의된 전환 경로가 있어야 작동합니다. 경로가 없으면 전환이 무시됩니다. 에디터에서 상태 간 화살표(전환 선)를 반드시 연결하세요.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 11: 루트 모션 (Root Motion) -->
+      <section data-narration="루트 모션은 애니메이션 데이터에 포함된 루트 본의 이동값을 캐릭터의 실제 이동에 적용하는 기법입니다. 애니메이터가 의도한 정확한 발 디딤과 이동 거리를 게임에 반영할 수 있어, 발이 미끄러지는 현상 없이 자연스러운 이동이 가능합니다. AnimationTree의 root_motion_track을 설정하면 루트 본의 변위를 추출하여 CharacterBody3D의 velocity에 적용할 수 있습니다.">
+        <h2>루트 모션 (Root Motion)</h2>
+        <p><span class="badge badge-blue">정밀 이동</span> 애니메이션 데이터로 캐릭터를 실제 이동</p>
+        <div class="two-columns">
+          <div>
+            <div class="key-point">
+              <h3>루트 모션의 장점</h3>
+              <ul>
+                <li>발 미끄러짐 방지 (풋 슬라이딩 제거)</li>
+                <li>애니메이터 의도대로 정확한 이동 거리</li>
+                <li>복잡한 이동(구르기, 넘기 등)도 자연스러움</li>
+                <li>물리 기반 이동과 조합 가능</li>
+              </ul>
+            </div>
+            <div class="tip">
+              <strong>Tip:</strong> Blender에서 루트 모션 애니메이션을 만들 때, Hips 본이 실제로 이동하도록 키프레임을 설정하세요. 제자리 애니메이션과 루트 모션 애니메이션을 구분하여 관리하는 것이 좋습니다.
+            </div>
+          </div>
+          <div>
+            <pre><code class="language-gdscript"># AnimationTree에서 루트 모션 설정
+# Inspector &gt; AnimationTree:
+#   root_motion_track = "Armature/Skeleton3D:Hips"
+# 루트 본(Hips)의 이동을 추출
+
+@onready var anim_tree: AnimationTree = (
+    $AnimationTree
+)
+@onready var body: CharacterBody3D = $".."
+
+func _physics_process(delta: float):
+    # 루트 모션에서 이동량 추출
+    var root_motion = (
+        anim_tree.get_root_motion_position()
+    )
+
+    # 캐릭터 방향에 맞게 변환
+    var motion = (
+        body.global_transform.basis * root_motion
+    )
+
+    # CharacterBody3D에 적용
+    body.velocity.x = motion.x / delta
+    body.velocity.z = motion.z / delta
+
+    # 중력은 별도 처리
+    if not body.is_on_floor():
+        body.velocity.y -= 9.8 * delta
+
+    body.move_and_slide()
+
+    # 루트 모션의 회전도 적용 가능
+    var root_rot = (
+        anim_tree.get_root_motion_rotation()
+    )
+    body.global_transform.basis *= Basis(root_rot)</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 12: IK (Inverse Kinematics) 개요 -->
+      <section data-narration="역운동학, IK는 목표 지점을 기반으로 관절 체인의 각도를 자동으로 계산하는 기법입니다. 정운동학(FK)이 어깨에서 손목 방향으로 순차적으로 회전을 적용한다면, IK는 손의 목표 위치를 정하면 팔꿈치와 어깨가 자동으로 적절한 각도를 찾습니다. 발이 경사면에 맞게 놓이거나, 손이 문 손잡이를 정확히 잡는 등의 효과에 사용됩니다.">
+        <h2>IK (Inverse Kinematics) 개요</h2>
+        <p><span class="badge badge-green">역운동학</span> 목표 지점 기반으로 관절 각도 자동 계산</p>
+        <div class="two-columns">
+          <div>
+            <div class="key-point">
+              <h3>FK vs IK 비교</h3>
+              <table class="compare-table">
+                <tr>
+                  <th>항목</th>
+                  <th>FK (정운동학)</th>
+                  <th>IK (역운동학)</th>
+                </tr>
+                <tr>
+                  <td>방향</td>
+                  <td>루트에서 끝으로</td>
+                  <td>끝에서 루트로</td>
+                </tr>
+                <tr>
+                  <td>입력</td>
+                  <td>각 관절의 회전 값</td>
+                  <td>끝단의 목표 위치</td>
+                </tr>
+                <tr>
+                  <td>용도</td>
+                  <td>애니메이션 클립 재생</td>
+                  <td>환경 적응, 조준</td>
+                </tr>
+                <tr>
+                  <td>예시</td>
+                  <td>걷기 애니메이션</td>
+                  <td>경사면에 발 맞춤</td>
+                </tr>
+              </table>
+            </div>
+            <div class="key-point">
+              <h3>IK 활용 사례</h3>
+              <ul>
+                <li>발이 경사면/계단에 맞게 위치</li>
+                <li>손이 벽이나 물체를 짚는 동작</li>
+                <li>무기 조준 시 상체 회전</li>
+                <li>머리가 목표를 바라보는 LookAt</li>
+              </ul>
+            </div>
+          </div>
+          <div>
+            <pre><code class="language-gdscript"># IK의 기본 원리 (2본 체인 예시)
+#
+# 어깨(A) -- 팔꿈치(B) -- 손(C)
+#
+# FK: A 회전 -&gt; B 위치 결정 -&gt; B 회전 -&gt; C 위치 결정
+# IK: C의 목표 위치 설정 -&gt; B, A의 회전 자동 계산
+#
+# Godot에서 제공하는 IK 노드:
+# - SkeletonIK3D (레거시, 간단한 체인)
+# - 커스텀 FABRIK/CCD 구현 (고급)
+
+# 간단한 LookAt IK (머리 회전)
+func look_at_ik(target_pos: Vector3):
+    var skeleton = $Skeleton3D
+    var head_idx = skeleton.find_bone("Head")
+    var neck_idx = skeleton.find_bone("Neck")
+
+    # 목표 방향 계산
+    var head_global = (
+        skeleton.global_transform
+        * skeleton.get_bone_global_pose(head_idx)
+    )
+    var dir = (
+        target_pos - head_global.origin
+    ).normalized()
+
+    # 회전 적용 (제한 범위 내)
+    var look_basis = Basis.looking_at(dir)
+    var current = skeleton.get_bone_pose_rotation(
+        head_idx
+    )
+    var target_rot = Quaternion(look_basis)
+    # 부드럽게 보간
+    var result = current.slerp(target_rot, 0.1)
+    skeleton.set_bone_pose_rotation(
+        head_idx, result
+    )</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 13: SkeletonIK3D -->
+      <section data-narration="SkeletonIK3D는 Godot에서 제공하는 IK 솔버 노드입니다. Skeleton3D의 자식으로 추가하고, 루트 본과 팁 본을 지정한 다음 목표 노드(Target)를 설정하면 자동으로 관절 체인을 해석합니다. 보간 값으로 IK 영향력을 조절할 수 있어, 기존 애니메이션과 부드럽게 블렌딩됩니다. 발 IK 시스템 같은 실용적 구현에 바로 활용할 수 있습니다.">
+        <h2>SkeletonIK3D</h2>
+        <p><span class="badge badge-blue">IK 솔버</span> 내장 IK 노드로 관절 체인 자동 해석</p>
+        <div class="two-columns">
+          <div>
+            <pre><code class="language-gdscript"># 씬 트리 구성
+# Character
+# └ Skeleton3D
+#   ├ MeshInstance3D
+#   ├ SkeletonIK3D (왼발)
+#   │   root_bone = "LeftUpLeg"
+#   │   tip_bone = "LeftFoot"
+#   │   target_node = ../LeftFootTarget
+#   ├ SkeletonIK3D (오른발)
+#   │   root_bone = "RightUpLeg"
+#   │   tip_bone = "RightFoot"
+#   │   target_node = ../RightFootTarget
+#   ├ Marker3D (LeftFootTarget)
+#   └ Marker3D (RightFootTarget)
+
+# SkeletonIK3D 설정
+@onready var left_ik: SkeletonIK3D = (
+    $Skeleton3D/LeftFootIK
+)
+@onready var right_ik: SkeletonIK3D = (
+    $Skeleton3D/RightFootIK
+)
+
+func _ready():
+    left_ik.start()
+    right_ik.start()
+
+func disable_foot_ik():
+    left_ik.stop()
+    right_ik.stop()</code></pre>
+          </div>
+          <div>
+            <h3>발 IK (Foot Placement)</h3>
+            <pre><code class="language-gdscript"># 발 IK: 경사면에 발 맞추기
+@onready var left_target: Marker3D = (
+    $Skeleton3D/LeftFootTarget
+)
+@onready var right_target: Marker3D = (
+    $Skeleton3D/RightFootTarget
+)
+@onready var ray_left: RayCast3D = $LeftFootRay
+@onready var ray_right: RayCast3D = $RightFootRay
+
+func _physics_process(delta: float):
+    update_foot_ik(
+        ray_left, left_target, delta
+    )
+    update_foot_ik(
+        ray_right, right_target, delta
+    )
+
+func update_foot_ik(
+    ray: RayCast3D,
+    target: Marker3D,
+    delta: float
+):
+    if ray.is_colliding():
+        var hit_point = ray.get_collision_point()
+        var hit_normal = ray.get_collision_normal()
+
+        # 목표 위치를 충돌 지점으로
+        target.global_position = hit_point
+        # 법선 방향으로 발 회전
+        var foot_basis = Basis.looking_at(
+            hit_normal.cross(
+                target.global_transform.basis.x
+            ),
+            hit_normal
+        )
+        target.global_transform.basis = (
+            target.global_transform.basis.slerp(
+                foot_basis, delta * 10.0
+            )
+        )</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 14: 절차적 애니메이션 기초 -->
+      <section data-narration="절차적 애니메이션은 미리 만들어진 클립이 아닌, 코드 로직과 물리 법칙으로 실시간 생성하는 애니메이션입니다. 스프링 시뮬레이션으로 무기 흔들림, 사인파로 숨쉬기 효과, 노이즈로 카메라 흔들림 등을 구현합니다. 환경과 상호작용에 따라 동적으로 반응하므로 미리 만든 애니메이션으로는 불가능한 자연스러운 표현이 가능합니다.">
+        <h2>절차적 애니메이션 기초</h2>
+        <p><span class="badge badge-orange">Procedural</span> 코드로 실시간 생성하는 동적 애니메이션</p>
+        <div class="two-columns">
+          <div>
+            <h3>스프링 시뮬레이션</h3>
+            <pre><code class="language-gdscript"># 스프링 기반 무기 흔들림 (Sway)
+var spring_position := Vector3.ZERO
+var spring_velocity := Vector3.ZERO
+
+@export var stiffness: float = 200.0
+@export var damping: float = 15.0
+
+func _process(delta: float):
+    # 목표 위치와의 차이
+    var target = Vector3.ZERO
+    var displacement = spring_position - target
+
+    # 스프링 힘 계산
+    var spring_force = (
+        -stiffness * displacement
+        - damping * spring_velocity
+    )
+
+    # 적분
+    spring_velocity += spring_force * delta
+    spring_position += spring_velocity * delta
+
+    # 무기에 적용
+    $WeaponPivot.position = spring_position
+
+# 마우스 이동 시 흔들림 추가
+func _input(event: InputEvent):
+    if event is InputEventMouseMotion:
+        var sway = Vector3(
+            -event.relative.x * 0.002,
+            -event.relative.y * 0.002,
+            0
+        )
+        spring_velocity += sway</code></pre>
+          </div>
+          <div>
+            <h3>숨쉬기 / 카메라 흔들림</h3>
+            <pre><code class="language-gdscript"># 사인파 기반 숨쉬기 (Breathing)
+var breath_time: float = 0.0
+
+func _process(delta: float):
+    breath_time += delta
+    var breath = sin(breath_time * 1.5) * 0.02
+    $Camera3D.position.y = 1.6 + breath
+
+# 노이즈 기반 카메라 흔들림
+var shake_intensity: float = 0.0
+var shake_decay: float = 5.0
+var noise := FastNoiseLite.new()
+
+func _ready():
+    noise.noise_type = FastNoiseLite.TYPE_PERLIN
+    noise.frequency = 1.0
+
+func camera_shake(intensity: float):
+    shake_intensity = intensity
+
+func _process(delta: float):
+    if shake_intensity &gt; 0.01:
+        var t = Time.get_ticks_msec() * 0.1
+        var offset = Vector3(
+            noise.get_noise_1d(t) * shake_intensity,
+            noise.get_noise_1d(t + 100) * shake_intensity,
+            0
+        )
+        $Camera3D.position += offset
+        shake_intensity = lerp(
+            shake_intensity, 0.0,
+            shake_decay * delta
+        )</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 15: Tween 3D 활용 -->
+      <section data-narration="Tween은 값을 부드럽게 보간하는 범용 애니메이션 도구로, 3D에서도 매우 유용합니다. 문 열기, 플랫폼 이동, 머티리얼 색상 전환, 카메라 연출 등 코드 기반 전환 효과에 적합합니다. AnimationPlayer보다 간단한 전환에는 Tween이 더 편리하고 코드도 깔끔합니다. 여러 트윈을 체이닝하거나 병렬로 실행할 수 있습니다.">
+        <h2>Tween 3D 활용</h2>
+        <p><span class="badge badge-green">보간</span> 코드 기반 부드러운 값 전환</p>
+        <div class="two-columns">
+          <div>
+            <pre><code class="language-gdscript"># 문 열기/닫기
+func open_door():
+    var tween = create_tween()
+    tween.tween_property(
+        $Door, "rotation_degrees:y",
+        -90.0, 0.8
+    ).set_ease(Tween.EASE_IN_OUT)
+    .set_trans(Tween.TRANS_CUBIC)
+
+func close_door():
+    var tween = create_tween()
+    tween.tween_property(
+        $Door, "rotation_degrees:y",
+        0.0, 0.6
+    ).set_ease(Tween.EASE_IN_OUT)
+
+# 엘리베이터 (순차 이동)
+func move_elevator():
+    var tween = create_tween()
+    tween.set_loops()  # 무한 반복
+    # 위로 이동
+    tween.tween_property(
+        $Elevator, "position:y",
+        10.0, 3.0
+    ).set_trans(Tween.TRANS_SINE)
+    # 대기
+    tween.tween_interval(2.0)
+    # 아래로 이동
+    tween.tween_property(
+        $Elevator, "position:y",
+        0.0, 3.0
+    ).set_trans(Tween.TRANS_SINE)
+    tween.tween_interval(2.0)</code></pre>
+          </div>
+          <div>
+            <pre><code class="language-gdscript"># 머티리얼 색상 전환 (피격 효과)
+func flash_damage():
+    var mat: StandardMaterial3D = (
+        $Mesh.get_surface_override_material(0)
+    )
+    var original = mat.albedo_color
+    var tween = create_tween()
+    tween.tween_property(
+        mat, "albedo_color",
+        Color.RED, 0.1
+    )
+    tween.tween_property(
+        mat, "albedo_color",
+        original, 0.3
+    )
+
+# 카메라 연출 (줌 + 이동)
+func cinematic_shot():
+    var tween = create_tween()
+    tween.set_parallel(true)  # 동시 실행
+    tween.tween_property(
+        $Camera3D, "position",
+        Vector3(5, 3, -8), 2.0
+    ).set_trans(Tween.TRANS_CUBIC)
+    tween.tween_property(
+        $Camera3D, "fov",
+        40.0, 2.0
+    ).set_trans(Tween.TRANS_SINE)
+
+    # 완료 콜백
+    tween.chain().tween_callback(
+        func(): print("연출 완료")
+    )</code></pre>
+            <div class="tip">
+              <strong>Tip:</strong> <code>set_parallel(true)</code>는 이후 추가되는 트윈을 동시에 실행합니다. <code>chain()</code>은 다시 순차 모드로 전환합니다.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 16: 애니메이션 리타겟팅 -->
+      <section data-narration="애니메이션 리타겟팅은 하나의 스켈레톤용으로 만든 애니메이션을 다른 스켈레톤에 적용하는 기술입니다. Mixamo 같은 서비스에서 다운받은 애니메이션을 자체 캐릭터에 적용하거나, 하나의 애니메이션 세트를 여러 체형의 캐릭터에 공유할 때 사용합니다. Godot 4는 본 맵을 통한 리타겟팅을 지원하여 본 이름이 다른 스켈레톤 간에도 애니메이션 공유가 가능합니다.">
+        <h2>애니메이션 리타겟팅</h2>
+        <p><span class="badge badge-blue">재사용</span> 하나의 애니메이션을 여러 캐릭터에 적용</p>
+        <div class="two-columns">
+          <div>
+            <div class="key-point">
+              <h3>리타겟팅이 필요한 상황</h3>
+              <ul>
+                <li>Mixamo 애니메이션을 커스텀 캐릭터에 적용</li>
+                <li>키 큰 캐릭터의 애니메이션을 작은 캐릭터에 공유</li>
+                <li>여러 종족(인간, 오크, 엘프)이 같은 동작 세트 사용</li>
+                <li>모션 캡처 데이터를 게임 캐릭터에 매핑</li>
+              </ul>
+            </div>
+            <div class="key-point">
+              <h3>Godot 4 리타겟팅 절차</h3>
+              <ol>
+                <li>BoneMap 리소스 생성</li>
+                <li>소스/타겟 본 이름 매핑 정의</li>
+                <li>SkeletonProfile (예: SkeletonProfileHumanoid) 활용</li>
+                <li>임포트 설정에서 리타겟팅 적용</li>
+              </ol>
+            </div>
+          </div>
+          <div>
+            <pre><code class="language-gdscript"># 본 맵 설정 (코드)
+func setup_bone_map():
+    var bone_map = BoneMap.new()
+    # SkeletonProfileHumanoid 사용
+    bone_map.profile = SkeletonProfileHumanoid.new()
+
+    # 소스 스켈레톤의 본 이름을 매핑
+    # Mixamo 본 이름 -&gt; 표준 이름
+    bone_map.set_skeleton_bone_name(
+        "Hips", "mixamorig:Hips"
+    )
+    bone_map.set_skeleton_bone_name(
+        "Spine", "mixamorig:Spine"
+    )
+    bone_map.set_skeleton_bone_name(
+        "Head", "mixamorig:Head"
+    )
+    # ...
+
+# 에디터에서 리타겟팅 설정:
+# 1. 모델 선택 &gt; Import 독
+# 2. Skeleton &gt; Retarget 섹션
+# 3. Bone Map에 BoneMap 리소스 할당
+# 4. SkeletonProfile: Humanoid 선택
+# 5. Auto Mapping 클릭 (자동 매핑 시도)
+# 6. 매핑 안 되는 본은 수동으로 지정
+# 7. Reimport
+
+# 런타임에 애니메이션 라이브러리 공유
+func share_animations(
+    source: AnimationPlayer,
+    target: AnimationPlayer
+):
+    for lib_name in source.get_animation_library_list():
+        var lib = source.get_animation_library(lib_name)
+        target.add_animation_library(lib_name, lib)</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 17: 실전: 3D 캐릭터 애니메이션 시스템 -->
+      <section data-narration="지금까지 배운 모든 기술을 통합한 실전 3D 캐릭터 애니메이션 시스템을 구축해 봅시다. AnimationTree로 이동 블렌딩과 상태 전환을 처리하고, 발 IK로 경사면 적응을 추가하며, Tween으로 피격 이펙트를 넣습니다. 이 시스템은 대부분의 3인칭 액션 게임에 바로 활용할 수 있는 구조입니다. 핵심은 각 시스템을 독립적으로 유지하면서도 유기적으로 연결하는 것입니다.">
+        <h2>실전: 3D 캐릭터 애니메이션 시스템</h2>
+        <p><span class="badge badge-red">종합</span> AnimationTree + IK + Tween 통합 시스템</p>
+        <pre><code class="language-gdscript"># character_animation_controller.gd
+# 완성된 3D 캐릭터 애니메이션 컨트롤러
+extends Node3D
+
+@onready var body: CharacterBody3D = $".."
+@onready var anim_tree: AnimationTree = $AnimationTree
+@onready var state_machine: AnimationNodeStateMachinePlayback = (
+    anim_tree.get("parameters/playback")
+)
+@onready var skeleton: Skeleton3D = $Armature/Skeleton3D
+
+# 상태 관리
+enum State { LOCOMOTION, ATTACK, DODGE, HIT, DEATH }
+var current_state: State = State.LOCOMOTION
+
+func _ready():
+    anim_tree.active = true
+
+func _physics_process(delta: float):
+    match current_state:
+        State.LOCOMOTION:
+            update_locomotion(delta)
+        State.ATTACK:
+            pass  # AnimationTree가 처리
+        State.HIT:
+            pass  # 피격 애니메이션 재생 중
+
+# 이동 블렌딩 (BlendSpace2D)
+func update_locomotion(delta: float):
+    var vel = body.global_transform.basis.inverse() * body.velocity
+    var max_speed = 6.0
+    var blend = Vector2(
+        clampf(vel.x / max_speed, -1.0, 1.0),
+        clampf(-vel.z / max_speed, -1.0, 1.0)
+    )
+    anim_tree.set("parameters/Locomotion/blend_position", blend)
+
+# 공격 시작
+func play_attack(attack_name: String):
+    current_state = State.ATTACK
+    # OneShot 노드로 공격 삽입
+    anim_tree.set("parameters/AttackOneShot/request", AnimationNodeOneShot.ONE_SHOT_REQUEST_FIRE)
+    await anim_tree.animation_finished
+    current_state = State.LOCOMOTION
+
+# 피격 효과
+func on_hit(direction: Vector3):
+    current_state = State.HIT
+    state_machine.travel("hit")
+    flash_damage()
+    await get_tree().create_timer(0.5).timeout
+    current_state = State.LOCOMOTION
+
+func flash_damage():
+    var mat = $Armature/Skeleton3D/MeshInstance3D.get_surface_override_material(0)
+    if mat:
+        var tween = create_tween()
+        tween.tween_property(mat, "emission_energy_multiplier", 3.0, 0.05)
+        tween.tween_property(mat, "emission_energy_multiplier", 0.0, 0.3)</code></pre>
+        <div class="tip">
+          <strong>Tip:</strong> 각 기능(이동 블렌딩, 공격, 피격, IK)을 별도 메서드로 분리하면 유지보수와 확장이 쉽습니다. 상태 패턴과 결합하면 더욱 견고한 시스템이 됩니다.
+        </div>
+      </section>
+
+      <!-- Slide 18: 정리 + 다음 챕터 예고 -->
+      <section data-narration="이번 챕터에서는 3D 모델 임포트부터 스켈레탈 애니메이션, AnimationTree 블렌딩, BlendSpace, 루트 모션, IK, 절차적 애니메이션, Tween 활용, 리타겟팅, 그리고 실전 통합 시스템까지 3D 애니메이션의 핵심을 모두 다뤘습니다. 다음 챕터에서는 3D 레벨 디자인을 배우며, 지형 생성, GridMap, 프로브 조명, 오클루전 컬링 등 3D 세계를 구축하는 기술을 학습합니다.">
+        <h2>Chapter 18 정리</h2>
+        <table class="compare-table">
+          <tr>
+            <th>주제</th>
+            <th>핵심 키워드</th>
+          </tr>
+          <tr>
+            <td>모델 임포트</td>
+            <td>glTF(권장), FBX, OBJ, 임포트 설정, 클립 분리</td>
+          </tr>
+          <tr>
+            <td>Skeleton3D</td>
+            <td>본 계층, 인덱스, 트랜스폼, 포즈 제어</td>
+          </tr>
+          <tr>
+            <td>BoneAttachment3D</td>
+            <td>본에 오브젝트 부착, 무기 장착</td>
+          </tr>
+          <tr>
+            <td>AnimationPlayer 3D</td>
+            <td>클립 재생, 블렌딩, 메서드 호출 트랙</td>
+          </tr>
+          <tr>
+            <td>AnimationTree</td>
+            <td>StateMachine, BlendTree, Blend2, OneShot</td>
+          </tr>
+          <tr>
+            <td>BlendSpace</td>
+            <td>1D(속도), 2D(방향), 자동 보간</td>
+          </tr>
+          <tr>
+            <td>전환 조건</td>
+            <td>travel, advance_condition, xfade</td>
+          </tr>
+          <tr>
+            <td>루트 모션</td>
+            <td>애니메이션 기반 이동, 풋 슬라이딩 방지</td>
+          </tr>
+          <tr>
+            <td>IK / SkeletonIK3D</td>
+            <td>역운동학, 발 배치, LookAt</td>
+          </tr>
+          <tr>
+            <td>절차적 애니메이션</td>
+            <td>스프링, 노이즈, 카메라 흔들림</td>
+          </tr>
+          <tr>
+            <td>Tween 3D</td>
+            <td>보간, 체이닝, parallel, 연출</td>
+          </tr>
+          <tr>
+            <td>리타겟팅</td>
+            <td>BoneMap, SkeletonProfile, Mixamo</td>
+          </tr>
+        </table>
+      </section>
+
+      <!-- Slide 19 (end): Next Chapter -->
+      <section class="chapter-title" data-transition="zoom" data-narration="챕터 18을 마치겠습니다. 3D 모델 임포트, 스켈레탈 애니메이션, AnimationTree, BlendSpace, IK, 절차적 애니메이션까지 캐릭터에 생명을 불어넣는 모든 기술을 학습했습니다. 다음 챕터에서는 3D 레벨 디자인을 다루며, 지형, GridMap, 라이팅, 오클루전 컬링 등 실제 3D 게임 월드를 구축하는 방법을 배웁니다. 멋진 3D 세계를 만들어 봅시다!">
+        <span class="chapter-number">Next</span>
+        <h1>수고하셨습니다!</h1>
+        <br>
+        <p><a href="19-3d-level-design.html" style="color: var(--gd-blue); font-size: 1.2em;">다음 챕터: 3D 레벨 디자인 &#8594;</a></p>
+        <br>
+        <p><a href="../index.html" style="color: #888; font-size: 0.7em;">&#8592; 목차로 돌아가기</a></p>
+      </section>
+
+    </div>
+  </div>
+  <div class="nav-footer"><a href="../index.html" style="color: #888;">Godot 초보부터 고수까지</a> | Chapter 18</div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/plugin/highlight/highlight.min.js"></script>
+  <script>
+    Reveal.initialize({ hash: true, slideNumber: true, plugins: [RevealHighlight], transition: 'slide', height: 700, center: false, margin: 0.04, minScale: 0.2, maxScale: 1.5, keyboard: { 38: null, 40: null }, mouseWheel: false });
+    document.addEventListener('keydown', function(e) { if (e.keyCode === 38 || e.keyCode === 40) { var slide = Reveal.getCurrentSlide(); if (!slide) return; var amount = 80; if (e.keyCode === 38) { slide.scrollTop -= amount; } else { slide.scrollTop += amount; } e.preventDefault(); e.stopPropagation(); } }, true);
+  </script>
+  <script src="js/narration.js"></script>
+</body>
+</html>

@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 13: 3D 기초 - Godot 초보부터 고수까지</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/theme/night.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/plugin/highlight/monokai.min.css">
+  <link rel="stylesheet" href="css/custom.css">
+  <link rel="stylesheet" href="css/narration.css">
+</head>
+<body>
+  <div class="reveal">
+    <div class="slides">
+
+      <!-- Slide 1: Title -->
+      <section class="chapter-title" data-transition="zoom" data-narration="챕터 13에서는 드디어 3D 세계로 들어갑니다. 3D 좌표계와 오른손 법칙, Node3D의 Transform 시스템, MeshInstance3D와 프리미티브 메시, Camera3D의 투영 방식, 그리고 DirectionalLight3D 등 기본 조명까지 학습합니다. 2D에서 배운 개념이 3D에서도 그대로 확장되므로 걱정하지 마세요. 차근차근 3D의 기초를 다져보겠습니다.">
+        <span class="chapter-number">Chapter 13</span>
+        <h1>3D 기초</h1>
+        <p class="subtitle">좌표계, 메시, 카메라, 조명 - 3D 세계의 첫걸음</p>
+        <br>
+        <p><a href="../index.html" style="color: #888; font-size: 0.6em;">&#8592; 목차로 돌아가기</a></p>
+      </section>
+
+      <!-- Slide 2: 3D 좌표계 -->
+      <section data-narration="3D 공간은 X, Y, Z 세 개의 축으로 구성됩니다. Godot는 Y-up 좌표계를 사용하여 Y축이 위쪽을 가리킵니다. X축은 오른쪽, Z축은 화면 앞쪽(카메라를 향하는 방향)입니다. 이것은 오른손 법칙을 따르는데 오른손 엄지가 X, 검지가 Y, 중지가 Z 방향입니다. 다른 엔진과 축 방향이 다를 수 있으므로 Godot의 Y-up 규칙을 확실히 기억하세요.">
+        <h2>3D 좌표계 (X / Y / Z)</h2>
+        <div class="key-point">
+          <h3>Godot의 3D 좌표 규칙</h3>
+          <p>Godot는 <strong>Y-up 오른손 좌표계</strong>를 사용합니다. Y축이 위, X축이 오른쪽, Z축이 카메라를 향합니다.</p>
+        </div>
+        <div class="two-columns">
+          <div>
+            <h3 style="color: var(--gd-green);">축 방향</h3>
+            <pre><code class="language-gdscript">#        +Y (위)
+#         |
+#         |
+#         +------ +X (오른쪽)
+#        /
+#       /
+#      +Z (카메라 쪽, 앞)
+
+# 오른손 법칙:
+# 엄지 = +X (오른쪽)
+# 검지 = +Y (위쪽)
+# 중지 = +Z (앞쪽)</code></pre>
+          </div>
+          <div>
+            <h3 style="color: var(--gd-blue);">Vector3 기본값</h3>
+            <pre><code class="language-gdscript"># Godot 내장 상수
+Vector3.UP      # (0, 1, 0)  위
+Vector3.DOWN    # (0, -1, 0) 아래
+Vector3.RIGHT   # (1, 0, 0)  오른쪽
+Vector3.LEFT    # (-1, 0, 0) 왼쪽
+Vector3.FORWARD # (0, 0, -1) 앞 (화면 안쪽)
+Vector3.BACK    # (0, 0, 1)  뒤 (카메라 쪽)
+Vector3.ZERO    # (0, 0, 0)  원점
+Vector3.ONE     # (1, 1, 1)</code></pre>
+          </div>
+        </div>
+        <div class="warning">
+          <strong>주의:</strong> Godot에서 <code>Vector3.FORWARD</code>는 <code>(0, 0, -1)</code>입니다. -Z 방향이 앞쪽입니다. Blender 등 다른 툴과 축이 다를 수 있으니 모델 임포트 시 주의하세요.
+        </div>
+      </section>
+
+      <!-- Slide 3: 2D vs 3D 비교 -->
+      <section data-narration="2D에서 배운 노드 구조와 개념은 3D에서도 동일하게 적용됩니다. Node2D가 Node3D로, Sprite2D가 MeshInstance3D로, Camera2D가 Camera3D로 대응합니다. 좌표도 Vector2 대신 Vector3를 사용하고 회전은 라디안 단축 축 대신 3축 회전이나 쿼터니언을 사용합니다. 물리 바디도 마찬가지로 CharacterBody3D, RigidBody3D 등 3D 버전이 있습니다. 이름 뒤에 3D가 붙는다고 생각하면 됩니다.">
+        <h2>2D vs 3D 비교</h2>
+        <p>2D에서 배운 개념이 3D로 <strong>자연스럽게 확장</strong>됩니다</p>
+        <table class="compare-table">
+          <tr><th>2D</th><th>3D</th><th>변경점</th></tr>
+          <tr class="fragment"><td><code>Node2D</code></td><td><code>Node3D</code></td><td>기본 3D 노드 (위치, 회전, 스케일)</td></tr>
+          <tr class="fragment"><td><code>Sprite2D</code></td><td><code>MeshInstance3D</code></td><td>3D 메시를 화면에 표시</td></tr>
+          <tr class="fragment"><td><code>Camera2D</code></td><td><code>Camera3D</code></td><td>원근/직교 투영 지원</td></tr>
+          <tr class="fragment"><td><code>CharacterBody2D</code></td><td><code>CharacterBody3D</code></td><td>3D 물리 이동</td></tr>
+          <tr class="fragment"><td><code>RigidBody2D</code></td><td><code>RigidBody3D</code></td><td>3D 물리 시뮬레이션</td></tr>
+          <tr class="fragment"><td><code>Area2D</code></td><td><code>Area3D</code></td><td>3D 영역 감지</td></tr>
+          <tr class="fragment"><td><code>CollisionShape2D</code></td><td><code>CollisionShape3D</code></td><td>3D 충돌 형태</td></tr>
+          <tr class="fragment"><td><code>Vector2</code></td><td><code>Vector3</code></td><td>Z축 추가 (x, y, z)</td></tr>
+        </table>
+        <div class="tip fragment">
+          <strong>핵심:</strong> 2D에서 배운 시그널, 그룹, _process, _physics_process, 씬 구조 등은 3D에서도 <strong>완전히 동일</strong>하게 작동합니다. 노드 타입만 3D 버전으로 바뀔 뿐입니다.
+        </div>
+      </section>
+
+      <!-- Slide 4: Node3D - Transform -->
+      <section data-narration="Node3D는 3D 공간에서의 위치, 회전, 크기를 가지는 기본 노드입니다. position은 Vector3로 3D 좌표를, rotation은 라디안 단위의 오일러 각도를 나타냅니다. rotation_degrees를 쓰면 도 단위로 편리하게 설정할 수 있습니다. scale도 Vector3로 각 축별 크기를 조절합니다. global_position과 global_rotation은 월드 좌표 기준이고, position과 rotation은 부모 기준 로컬 좌표입니다.">
+        <h2>Node3D - Transform 기본</h2>
+        <p><span class="badge badge-blue">기본 노드</span> 3D 공간의 위치, 회전, 크기를 가지는 모든 3D 노드의 부모</p>
+        <pre><code class="language-gdscript">extends Node3D
+
+func _ready():
+    # 위치 (로컬 좌표)
+    position = Vector3(2.0, 1.0, -3.0)  # x, y, z
+
+    # 회전 (라디안)
+    rotation = Vector3(0, deg_to_rad(90), 0)  # Y축 90도 회전
+
+    # 회전 (도 단위 - 더 편리!)
+    rotation_degrees = Vector3(0, 90, 0)
+
+    # 크기
+    scale = Vector3(2.0, 2.0, 2.0)  # 2배 확대
+
+    # 월드 좌표 (절대 좌표)
+    global_position = Vector3(5.0, 0, 0)
+
+    # 로컬 이동 (자기 방향 기준)
+    translate(Vector3(0, 0, -1))  # 앞으로 1유닛 이동</code></pre>
+        <table class="compare-table fragment" style="font-size: 0.75em;">
+          <tr><th>속성</th><th>타입</th><th>좌표 기준</th><th>설명</th></tr>
+          <tr><td><code>position</code></td><td>Vector3</td><td>로컬(부모 기준)</td><td>위치</td></tr>
+          <tr><td><code>global_position</code></td><td>Vector3</td><td>월드(절대)</td><td>월드 위치</td></tr>
+          <tr><td><code>rotation</code></td><td>Vector3</td><td>로컬</td><td>라디안 회전</td></tr>
+          <tr><td><code>rotation_degrees</code></td><td>Vector3</td><td>로컬</td><td>도 단위 회전</td></tr>
+          <tr><td><code>scale</code></td><td>Vector3</td><td>로컬</td><td>각 축 크기</td></tr>
+        </table>
+      </section>
+
+      <!-- Slide 5: MeshInstance3D와 프리미티브 메시 -->
+      <section data-narration="MeshInstance3D는 3D 메시를 화면에 표시하는 노드입니다. mesh 속성에 Mesh 리소스를 할당하면 됩니다. Godot는 BoxMesh, SphereMesh, CylinderMesh, CapsuleMesh, PlaneMesh, PrismMesh, TorusMesh 등 다양한 프리미티브 메시를 제공합니다. 프리미티브 메시는 프로토타이핑에 매우 유용하며 별도의 3D 모델 없이도 빠르게 씬을 구성할 수 있습니다. 각 메시는 크기와 세분화 수준을 설정할 수 있습니다.">
+        <h2>MeshInstance3D와 프리미티브 메시</h2>
+        <p><span class="badge badge-green">시각 표현</span> 3D 메시를 화면에 렌더링하는 노드</p>
+        <div class="two-columns">
+          <div>
+            <h3 style="color: var(--gd-blue);">프리미티브 종류</h3>
+            <table class="compare-table" style="font-size: 0.7em;">
+              <tr><th>메시</th><th>형태</th><th>주요 속성</th></tr>
+              <tr><td><code>BoxMesh</code></td><td>상자</td><td>size (Vector3)</td></tr>
+              <tr><td><code>SphereMesh</code></td><td>구</td><td>radius, height</td></tr>
+              <tr><td><code>CylinderMesh</code></td><td>원기둥</td><td>top/bottom_radius, height</td></tr>
+              <tr><td><code>CapsuleMesh</code></td><td>캡슐</td><td>radius, height</td></tr>
+              <tr><td><code>PlaneMesh</code></td><td>평면</td><td>size (Vector2)</td></tr>
+              <tr><td><code>PrismMesh</code></td><td>삼각 기둥</td><td>size (Vector3)</td></tr>
+              <tr><td><code>TorusMesh</code></td><td>도넛</td><td>inner/outer_radius</td></tr>
+            </table>
+          </div>
+          <div>
+            <h3 style="color: var(--gd-green);">코드로 생성</h3>
+            <pre><code class="language-gdscript"># 상자 메시 생성
+var mesh_inst = MeshInstance3D.new()
+var box = BoxMesh.new()
+box.size = Vector3(2, 1, 3)
+mesh_inst.mesh = box
+add_child(mesh_inst)
+
+# 구 메시 생성
+var sphere_inst = MeshInstance3D.new()
+var sphere = SphereMesh.new()
+sphere.radius = 0.5
+sphere.height = 1.0
+sphere_inst.mesh = sphere
+sphere_inst.position = Vector3(3, 0.5, 0)
+add_child(sphere_inst)</code></pre>
+          </div>
+        </div>
+        <div class="tip fragment">
+          <strong>에디터 팁:</strong> MeshInstance3D를 추가한 뒤 인스펙터에서 Mesh 드롭다운을 클릭하면 New BoxMesh 등 프리미티브를 바로 선택할 수 있습니다.
+        </div>
+      </section>
+
+      <!-- Slide 6: 머티리얼 기초 -->
+      <section data-narration="메시의 외관은 머티리얼로 결정됩니다. StandardMaterial3D는 가장 많이 사용되는 PBR 기반 머티리얼입니다. albedo_color로 기본 색상을 설정하고, metallic과 roughness로 금속성과 거칠기를 제어합니다. albedo_texture에 텍스처를 할당하면 이미지를 표면에 입힐 수 있습니다. 머티리얼은 여러 MeshInstance3D에서 재사용할 수 있어 효율적입니다.">
+        <h2>머티리얼(Material) 기초</h2>
+        <p><span class="badge badge-orange">외관 설정</span> 메시의 색상, 질감, 반사를 결정하는 리소스</p>
+        <div class="two-columns">
+          <div>
+            <pre><code class="language-gdscript"># StandardMaterial3D 생성
+var mat = StandardMaterial3D.new()
+
+# 기본 색상
+mat.albedo_color = Color(0.8, 0.2, 0.2)
+
+# 금속성 (0.0 ~ 1.0)
+mat.metallic = 0.3
+
+# 거칠기 (0.0 = 매끈, 1.0 = 거침)
+mat.roughness = 0.7
+
+# 자체 발광
+mat.emission_enabled = true
+mat.emission = Color(1, 0.5, 0)
+mat.emission_energy_multiplier = 2.0
+
+# 메시에 적용
+$MeshInstance3D.material_override = mat</code></pre>
+          </div>
+          <div>
+            <pre><code class="language-gdscript"># 텍스처 입히기
+var mat = StandardMaterial3D.new()
+var tex = load("res://assets/textures/brick.png")
+mat.albedo_texture = tex
+
+# 투명도 설정
+mat.transparency = \
+    BaseMaterial3D.TRANSPARENCY_ALPHA
+mat.albedo_color = Color(1, 1, 1, 0.5)
+
+# 양면 렌더링 (얇은 면일 때)
+mat.cull_mode = \
+    BaseMaterial3D.CULL_DISABLED</code></pre>
+            <div class="key-point">
+              <h3>PBR 핵심 속성</h3>
+              <ul>
+                <li><strong>Albedo</strong> - 기본 색상/텍스처</li>
+                <li><strong>Metallic</strong> - 금속 느낌</li>
+                <li><strong>Roughness</strong> - 표면 거칠기</li>
+                <li><strong>Emission</strong> - 자체 발광</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 7: Camera3D -->
+      <section data-narration="Camera3D는 3D 씬을 화면에 투영하는 노드입니다. 씬에 최소 하나의 카메라가 있어야 3D 장면이 보입니다. projection 속성으로 원근 투영과 직교 투영을 선택합니다. 원근 투영은 멀수록 작아지는 현실적인 시점이고, 직교 투영은 거리에 관계없이 크기가 동일한 시점입니다. fov는 시야각으로 기본 75도이며, near와 far는 렌더링 범위의 최소/최대 거리입니다.">
+        <h2>Camera3D</h2>
+        <p><span class="badge badge-blue">필수</span> 3D 씬을 2D 화면에 투영하는 카메라</p>
+        <div class="two-columns">
+          <div>
+            <h3 style="color: var(--gd-green);">주요 속성</h3>
+            <table class="compare-table" style="font-size: 0.7em;">
+              <tr><th>속성</th><th>기본값</th><th>설명</th></tr>
+              <tr><td><code>projection</code></td><td>Perspective</td><td>투영 방식</td></tr>
+              <tr><td><code>fov</code></td><td>75.0</td><td>시야각 (도, Perspective)</td></tr>
+              <tr><td><code>size</code></td><td>1.0</td><td>뷰 크기 (Orthogonal)</td></tr>
+              <tr><td><code>near</code></td><td>0.05</td><td>최소 렌더 거리</td></tr>
+              <tr><td><code>far</code></td><td>4000</td><td>최대 렌더 거리</td></tr>
+              <tr><td><code>current</code></td><td>false</td><td>활성 카메라 여부</td></tr>
+            </table>
+          </div>
+          <div>
+            <pre><code class="language-gdscript">extends Camera3D
+
+func _ready():
+    # 원근 투영 (3D 게임 기본)
+    projection = Camera3D.PROJECTION_PERSPECTIVE
+    fov = 70.0
+    near = 0.1
+    far = 1000.0
+
+    # 이 카메라를 활성화
+    current = true
+
+func switch_to_orthogonal():
+    # 직교 투영 (전략/퍼즐 게임)
+    projection = Camera3D.PROJECTION_ORTHOGONAL
+    size = 10.0  # 보이는 영역 크기</code></pre>
+          </div>
+        </div>
+        <div class="warning fragment">
+          <strong>주의:</strong> 씬에 카메라가 없으면 아무것도 보이지 않습니다. 3D 씬에는 반드시 Camera3D를 추가하고 <code>current = true</code>로 설정하세요.
+        </div>
+      </section>
+
+      <!-- Slide 8: 카메라 투영 종류 -->
+      <section data-narration="원근 투영은 가까운 물체가 크고 먼 물체가 작게 보이는 현실적인 원근감을 제공합니다. FPS, TPS, 액션 게임 등 대부분의 3D 게임에서 사용합니다. 직교 투영은 거리에 관계없이 모든 물체가 같은 크기로 보여서 전략 게임, 시뮬레이션, 아이소메트릭 뷰에 적합합니다. fov 값을 높이면 시야가 넓어지고 낮추면 줌인 효과가 납니다. 게임 장르에 따라 적절한 투영을 선택하세요.">
+        <h2>카메라 투영 종류</h2>
+        <div class="two-columns">
+          <div>
+            <h3 style="color: var(--gd-blue);">Perspective (원근)</h3>
+            <pre><code class="language-gdscript"># 원근 투영 - 현실적인 3D
+#   /             \
+#  /    물체가     \
+# / 멀수록 작아짐   \
+# ----카메라----
+#
+# fov = 70  (좁은 시야, 줌인)
+# fov = 90  (넓은 시야, 일반)
+# fov = 120 (매우 넓은, 왜곡)</code></pre>
+            <ul>
+              <li>FPS / TPS 게임</li>
+              <li>레이싱 게임</li>
+              <li>어드벤처 / RPG</li>
+            </ul>
+          </div>
+          <div>
+            <h3 style="color: var(--gd-green);">Orthogonal (직교)</h3>
+            <pre><code class="language-gdscript"># 직교 투영 - 원근감 없음
+# |             |
+# |  모든 물체가  |
+# |  같은 크기    |
+# ----카메라----
+#
+# size = 5   (줌인)
+# size = 10  (기본)
+# size = 20  (줌아웃)</code></pre>
+            <ul>
+              <li>전략 / 타워디펜스</li>
+              <li>아이소메트릭 RPG</li>
+              <li>건축 / 시뮬레이션</li>
+            </ul>
+          </div>
+        </div>
+        <pre class="fragment"><code class="language-gdscript"># 런타임에 줌 인/아웃
+func zoom(amount: float):
+    if projection == Camera3D.PROJECTION_PERSPECTIVE:
+        fov = clamp(fov - amount, 30.0, 120.0)
+    else:
+        size = clamp(size - amount, 2.0, 50.0)</code></pre>
+      </section>
+
+      <!-- Slide 9: 기본 조명 -->
+      <section data-narration="3D 씬에서 조명이 없으면 모든 것이 어둡게 보입니다. Godot는 세 가지 주요 조명을 제공합니다. DirectionalLight3D는 태양처럼 무한히 먼 곳에서 평행하게 비추는 빛입니다. OmniLight3D는 전구처럼 한 점에서 모든 방향으로 퍼지는 빛입니다. SpotLight3D는 손전등처럼 원뿔 형태로 특정 방향을 비추는 빛입니다. 각 조명은 색상, 강도, 그림자 등을 설정할 수 있습니다.">
+        <h2>기본 조명 (Lights)</h2>
+        <p>3D 씬에 빛이 없으면 아무것도 보이지 않습니다</p>
+        <table class="compare-table">
+          <tr><th>조명 타입</th><th>비유</th><th>방향</th><th>용도</th></tr>
+          <tr class="fragment">
+            <td><code>DirectionalLight3D</code></td>
+            <td>태양</td>
+            <td>평행광 (무한 거리)</td>
+            <td>주 조명, 야외 태양광</td>
+          </tr>
+          <tr class="fragment">
+            <td><code>OmniLight3D</code></td>
+            <td>전구</td>
+            <td>모든 방향 (점광원)</td>
+            <td>실내 조명, 횃불, 폭발</td>
+          </tr>
+          <tr class="fragment">
+            <td><code>SpotLight3D</code></td>
+            <td>손전등</td>
+            <td>원뿔형 (지향광)</td>
+            <td>손전등, 가로등, 스포트라이트</td>
+          </tr>
+        </table>
+        <pre class="fragment"><code class="language-gdscript"># 코드로 조명 생성
+func setup_lights():
+    # 태양광
+    var sun = DirectionalLight3D.new()
+    sun.rotation_degrees = Vector3(-45, -30, 0)
+    sun.light_color = Color(1.0, 0.95, 0.9)
+    sun.light_energy = 1.2
+    sun.shadow_enabled = true
+    add_child(sun)
+
+    # 점 조명 (횃불)
+    var torch = OmniLight3D.new()
+    torch.position = Vector3(0, 2, 0)
+    torch.light_color = Color(1.0, 0.7, 0.3)
+    torch.light_energy = 2.0
+    torch.omni_range = 8.0
+    add_child(torch)</code></pre>
+      </section>
+
+      <!-- Slide 10: 조명 속성 상세 -->
+      <section data-narration="모든 조명은 공통 속성을 공유합니다. light_color는 빛의 색상, light_energy는 밝기 강도입니다. shadow_enabled를 true로 하면 그림자가 생기는데 성능 비용이 있으므로 필요한 조명에만 켜세요. OmniLight3D의 omni_range는 빛이 닿는 최대 거리이고, SpotLight3D의 spot_angle은 원뿔의 각도입니다. attenuation은 거리에 따른 빛 감쇠 곡선을 제어합니다.">
+        <h2>조명 속성 상세</h2>
+        <div class="two-columns">
+          <div>
+            <h3 style="color: var(--gd-blue);">공통 속성</h3>
+            <table class="compare-table" style="font-size: 0.7em;">
+              <tr><th>속성</th><th>설명</th></tr>
+              <tr><td><code>light_color</code></td><td>빛 색상</td></tr>
+              <tr><td><code>light_energy</code></td><td>밝기 강도 (기본 1.0)</td></tr>
+              <tr><td><code>shadow_enabled</code></td><td>그림자 활성화</td></tr>
+              <tr><td><code>shadow_bias</code></td><td>그림자 아티팩트 보정</td></tr>
+              <tr><td><code>light_bake_mode</code></td><td>라이트맵 베이킹 모드</td></tr>
+            </table>
+            <h3 style="color: var(--gd-green);">타입별 고유 속성</h3>
+            <table class="compare-table" style="font-size: 0.7em;">
+              <tr><th>OmniLight3D</th><th>설명</th></tr>
+              <tr><td><code>omni_range</code></td><td>빛 도달 거리</td></tr>
+              <tr><td><code>omni_attenuation</code></td><td>감쇠 곡선</td></tr>
+              <tr><th>SpotLight3D</th><th>설명</th></tr>
+              <tr><td><code>spot_range</code></td><td>빛 도달 거리</td></tr>
+              <tr><td><code>spot_angle</code></td><td>원뿔 각도 (도)</td></tr>
+              <tr><td><code>spot_angle_attenuation</code></td><td>가장자리 감쇠</td></tr>
+            </table>
+          </div>
+          <div>
+            <pre><code class="language-gdscript"># SpotLight3D 예제 (손전등)
+var flashlight = SpotLight3D.new()
+flashlight.spot_range = 15.0
+flashlight.spot_angle = 25.0
+flashlight.light_energy = 3.0
+flashlight.shadow_enabled = true
+# 플레이어 카메라 자식으로 추가
+$Camera3D.add_child(flashlight)
+
+# 조명 깜빡임 효과
+func _process(delta):
+    var flicker = randf_range(0.8, 1.2)
+    $OmniLight3D.light_energy = \
+        base_energy * flicker</code></pre>
+            <div class="warning">
+              <strong>성능:</strong> 그림자는 성능 비용이 큽니다. <code>shadow_enabled</code>는 주요 조명(1-2개)에만 활성화하고, 보조 조명은 그림자 없이 사용하세요.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 11: 3D 뷰포트 조작 (에디터) -->
+      <section data-narration="Godot 에디터의 3D 뷰포트를 능숙하게 다루면 작업 효율이 크게 높아집니다. 마우스 가운데 버튼 드래그로 화면을 회전하고 Shift를 함께 누르면 이동합니다. 마우스 휠로 줌인 줌아웃하고, 숫자키패드로 정면, 측면, 위 등 정해진 뷰로 전환합니다. 기즈모를 사용해 물체를 이동, 회전, 스케일 할 수 있고 W E R 키로 기즈모 모드를 전환합니다. F 키로 선택한 노드에 포커스할 수 있습니다.">
+        <h2>3D 뷰포트 조작 (에디터)</h2>
+        <div class="two-columns">
+          <div>
+            <h3 style="color: var(--gd-blue);">마우스 조작</h3>
+            <table class="compare-table" style="font-size: 0.7em;">
+              <tr><th>입력</th><th>동작</th></tr>
+              <tr><td>마우스 중간 버튼 드래그</td><td>뷰 회전 (Orbit)</td></tr>
+              <tr><td>Shift + 중간 드래그</td><td>뷰 이동 (Pan)</td></tr>
+              <tr><td>마우스 휠</td><td>줌 인/아웃</td></tr>
+              <tr><td>우클릭 + WASD</td><td>FPS 스타일 이동</td></tr>
+              <tr><td>우클릭 + 휠</td><td>이동 속도 조절</td></tr>
+            </table>
+          </div>
+          <div>
+            <h3 style="color: var(--gd-green);">키보드 단축키</h3>
+            <table class="compare-table" style="font-size: 0.7em;">
+              <tr><th>키</th><th>동작</th></tr>
+              <tr><td><code>W</code></td><td>이동 기즈모 (Move)</td></tr>
+              <tr><td><code>E</code></td><td>회전 기즈모 (Rotate)</td></tr>
+              <tr><td><code>R</code></td><td>크기 기즈모 (Scale)</td></tr>
+              <tr><td><code>F</code></td><td>선택 노드에 포커스</td></tr>
+              <tr><td><code>Numpad 1</code></td><td>정면 뷰 (Front)</td></tr>
+              <tr><td><code>Numpad 3</code></td><td>측면 뷰 (Right)</td></tr>
+              <tr><td><code>Numpad 7</code></td><td>상단 뷰 (Top)</td></tr>
+              <tr><td><code>Numpad 5</code></td><td>원근/직교 토글</td></tr>
+            </table>
+          </div>
+        </div>
+        <div class="tip fragment">
+          <strong>Tip:</strong> 뷰포트 왼쪽 상단의 [Perspective] 텍스트를 클릭하면 뷰 전환 메뉴가 나타납니다. 넘패드가 없는 노트북에서는 에디터 설정에서 넘패드 에뮬레이션을 활성화하세요.
+        </div>
+      </section>
+
+      <!-- Slide 12: Transform3D와 Basis -->
+      <section data-narration="Transform3D는 3D 공간에서 물체의 위치와 방향을 하나로 합친 구조체입니다. origin은 위치를 나타내는 Vector3이고, basis는 회전과 스케일을 나타내는 3x3 행렬입니다. Basis는 세 개의 Vector3 열로 구성되는데, x열은 오른쪽 방향, y열은 위쪽 방향, z열은 뒤쪽 방향을 나타냅니다. Transform3D를 직접 조작하면 복잡한 변환을 효율적으로 수행할 수 있습니다.">
+        <h2>Transform3D와 Basis</h2>
+        <p><span class="badge badge-blue">핵심 개념</span> 위치 + 방향 + 크기를 하나로 표현하는 구조체</p>
+        <div class="two-columns">
+          <div>
+            <pre><code class="language-gdscript"># Transform3D 구조
+# transform = Transform3D(basis, origin)
+#   basis  : Basis (3x3 행렬, 회전+스케일)
+#   origin : Vector3 (위치)
+
+func _ready():
+    # 현재 트랜스폼 접근
+    var t = transform
+    print(t.origin)  # 위치
+    print(t.basis)   # 회전+스케일
+
+    # Basis의 축 벡터
+    var right   = transform.basis.x  # 오른쪽
+    var up      = transform.basis.y  # 위쪽
+    var forward = -transform.basis.z # 앞쪽</code></pre>
+          </div>
+          <div>
+            <pre><code class="language-gdscript"># 자기 방향 기준 이동 (로컬 이동)
+func move_forward(delta: float):
+    # -Z가 앞 방향이므로
+    var forward = -transform.basis.z
+    position += forward * speed * delta
+
+# 트랜스폼 보간 (부드러운 전환)
+func _process(delta):
+    var target_transform = $Target.transform
+    transform = transform.interpolate_with(
+        target_transform, delta * 5.0
+    )</code></pre>
+            <div class="key-point">
+              <h3>Basis 열 벡터</h3>
+              <ul>
+                <li><code>basis.x</code> - 로컬 오른쪽</li>
+                <li><code>basis.y</code> - 로컬 위쪽</li>
+                <li><code>basis.z</code> - 로컬 뒤쪽</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 13: 회전 - Euler와 Quaternion -->
+      <section data-narration="3D 회전은 2D보다 훨씬 복잡합니다. 오일러 각도는 X Y Z 축 각각의 회전을 도 또는 라디안으로 표현하여 직관적이지만, 짐벌 락이라는 문제가 있습니다. 특정 축이 겹치면 자유도가 하나 줄어드는 현상입니다. 쿼터니언은 4개의 값으로 회전을 표현하며 짐벌 락 없이 부드러운 보간이 가능합니다. Godot에서는 일반적으로 오일러를 사용하되 보간이 필요한 경우 쿼터니언을 사용합니다.">
+        <h2>회전: Euler vs Quaternion</h2>
+        <div class="two-columns">
+          <div>
+            <h3 style="color: var(--gd-blue);">Euler (오일러 각도)</h3>
+            <pre><code class="language-gdscript"># 직관적 - X,Y,Z 축 회전각
+rotation_degrees = Vector3(30, 45, 0)
+# X: 고개 숙임 (Pitch)
+# Y: 좌우 회전 (Yaw)
+# Z: 기울기   (Roll)
+
+# 한 축만 회전
+rotation_degrees.y += 90
+
+# 라디안 단위
+rotation.y = deg_to_rad(45)</code></pre>
+            <p style="color: var(--gd-red); font-size: 0.8em;">단점: 짐벌 락 (Gimbal Lock) 발생 가능</p>
+          </div>
+          <div>
+            <h3 style="color: var(--gd-green);">Quaternion (쿼터니언)</h3>
+            <pre><code class="language-gdscript"># 4D 벡터 (x, y, z, w)
+# 짐벌 락 없음, 부드러운 보간
+
+# 현재 쿼터니언
+var q = quaternion
+
+# 축-각도로 쿼터니언 생성
+var axis = Vector3.UP
+var angle = deg_to_rad(90)
+quaternion = Quaternion(axis, angle)
+
+# 부드러운 회전 보간 (slerp)
+quaternion = quaternion.slerp(
+    target_quat, delta * 5.0
+)</code></pre>
+          </div>
+        </div>
+        <div class="key-point fragment">
+          <h3>언제 무엇을 사용할까?</h3>
+          <ul>
+            <li><strong>Euler</strong> - 간단한 회전, 인스펙터 설정, 단일 축 회전</li>
+            <li><strong>Quaternion</strong> - 부드러운 회전 보간, 복잡한 3D 회전, 애니메이션</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- Slide 14: look_at() -->
+      <section data-narration="look_at 함수는 노드를 특정 위치를 바라보도록 회전시키는 매우 유용한 함수입니다. 첫 번째 인자는 바라볼 대상의 월드 좌표이고 두 번째 인자는 위쪽 방향 벡터입니다. 카메라가 플레이어를 따라가거나, 적이 플레이어를 바라보거나, 총구가 목표를 겨냥할 때 사용합니다. look_at을 매 프레임 호출하면 항상 대상을 추적하는 효과를 만들 수 있습니다. 부드럽게 회전하려면 basis slerp와 조합하세요.">
+        <h2>look_at() - 대상 바라보기</h2>
+        <p><span class="badge badge-green">필수 함수</span> 노드를 특정 위치를 향해 회전시킵니다</p>
+        <pre><code class="language-gdscript">extends Node3D
+
+@onready var target = $"../Target"
+
+func _process(delta):
+    # 대상을 바라보기 (위쪽 = Y축)
+    look_at(target.global_position, Vector3.UP)
+
+# look_at 주의사항:
+# - 자기 자신의 위치와 같은 좌표를 전달하면 에러!
+# - 위쪽 벡터와 바라보는 방향이 평행하면 에러!</code></pre>
+        <div class="two-columns fragment">
+          <div>
+            <h3 style="color: var(--gd-blue);">즉시 회전</h3>
+            <pre><code class="language-gdscript"># 바로 대상을 바라봄
+func face_target(target_pos: Vector3):
+    if global_position != target_pos:
+        look_at(target_pos, Vector3.UP)</code></pre>
+          </div>
+          <div>
+            <h3 style="color: var(--gd-green);">부드러운 추적</h3>
+            <pre><code class="language-gdscript"># 서서히 대상을 향해 회전
+func smooth_look_at(target_pos: Vector3, delta: float):
+    var target_xf = transform.looking_at(
+        target_pos, Vector3.UP
+    )
+    var new_basis = basis.slerp(
+        target_xf.basis, delta * 5.0
+    )
+    basis = new_basis</code></pre>
+          </div>
+        </div>
+        <div class="tip fragment">
+          <strong>활용:</strong> 카메라 추적, AI 적 시선, 미사일 유도, 빌보드 효과 등 3D 게임에서 필수적으로 사용됩니다.
+        </div>
+      </section>
+
+      <!-- Slide 15: Vector3 주요 메서드 -->
+      <section data-narration="Vector3는 3D 수학의 핵심 도구입니다. length로 벡터 길이를 구하고 normalized로 방향만 남깁니다. distance_to로 두 점 사이 거리를, angle_to로 두 벡터 사이 각도를 구합니다. dot 내적은 두 벡터의 방향 유사도를 cross 외적은 두 벡터에 수직인 벡터를 구합니다. lerp로 두 벡터 사이를 보간하고 move_toward로 일정 속도로 이동합니다. 이 메서드들은 3D 게임 프로그래밍에서 매일 사용됩니다.">
+        <h2>Vector3 주요 메서드</h2>
+        <div class="two-columns">
+          <div>
+            <h3 style="color: var(--gd-blue);">거리와 방향</h3>
+            <pre><code class="language-gdscript"># 벡터 길이 (크기)
+var v = Vector3(3, 4, 0)
+print(v.length())       # 5.0
+print(v.length_squared())  # 25 (빠름)
+
+# 정규화 (길이를 1로)
+var dir = v.normalized()
+
+# 두 점 사이 거리
+var dist = pos_a.distance_to(pos_b)
+
+# 방향 벡터 구하기
+var direction = (target - self_pos).normalized()
+
+# 이동
+position = position.move_toward(
+    target_pos, speed * delta
+)
+
+# 보간
+position = position.lerp(target_pos, 0.1)</code></pre>
+          </div>
+          <div>
+            <h3 style="color: var(--gd-green);">내적과 외적</h3>
+            <pre><code class="language-gdscript"># 내적 (Dot Product)
+# 방향 유사도: 1=같은방향, 0=수직, -1=반대
+var dot = forward.dot(to_target)
+if dot &gt; 0:
+    print("대상이 앞쪽에 있음")
+
+# 외적 (Cross Product)
+# 두 벡터에 수직인 벡터 반환
+var normal = vec_a.cross(vec_b)
+
+# 각도 (라디안)
+var angle = vec_a.angle_to(vec_b)
+
+# 반사 벡터
+var reflected = velocity.bounce(wall_normal)
+
+# 벡터 투영
+var projected = velocity.project(surface_normal)
+
+# 바닥에 투영 (Y 제거)
+var flat = Vector3(v.x, 0, v.z).normalized()</code></pre>
+          </div>
+        </div>
+        <div class="key-point fragment">
+          <h3>성능 팁</h3>
+          <p>거리 비교 시 <code>distance_to()</code> 대신 <code>distance_squared_to()</code>를 사용하면 제곱근 계산을 생략하여 더 빠릅니다. 비교 기준값도 제곱하면 됩니다.</p>
+        </div>
+      </section>
+
+      <!-- Slide 16: 간단한 3D 씬 구성 실습 -->
+      <section data-narration="지금까지 배운 내용을 종합하여 간단한 3D 씬을 구성해봅시다. 바닥 평면, 여러 개의 프리미티브 메시 객체, 카메라, 조명을 배치하고 간단한 카메라 회전 스크립트를 작성합니다. 이 실습은 에디터에서 직접 노드를 추가해도 좋고, 코드로 전부 생성해도 좋습니다. 결과물은 조명이 비추는 3D 공간에서 여러 물체가 배치되고 카메라가 천천히 회전하는 장면입니다.">
+        <h2>실습: 간단한 3D 씬 구성</h2>
+        <p><span class="badge badge-green">종합 실습</span> 바닥 + 물체 + 카메라 + 조명 구성</p>
+        <pre><code class="language-gdscript"># main_3d.gd - 루트 노드 (Node3D)에 연결
+extends Node3D
+
+func _ready():
+    # 1. 바닥 생성
+    var floor = MeshInstance3D.new()
+    var plane = PlaneMesh.new()
+    plane.size = Vector2(20, 20)
+    floor.mesh = plane
+    var floor_mat = StandardMaterial3D.new()
+    floor_mat.albedo_color = Color(0.3, 0.5, 0.3)
+    floor.material_override = floor_mat
+    add_child(floor)
+
+    # 2. 상자 생성
+    create_box(Vector3(0, 0.5, 0), Color.CORNFLOWER_BLUE)
+    create_box(Vector3(3, 0.5, -2), Color.INDIAN_RED)
+
+    # 3. 구 생성
+    var sphere_node = MeshInstance3D.new()
+    var sphere = SphereMesh.new()
+    sphere.radius = 0.5
+    sphere.height = 1.0
+    sphere_node.mesh = sphere
+    sphere_node.position = Vector3(-2, 0.5, 1)
+    add_child(sphere_node)
+
+    # 4. 태양광
+    var sun = DirectionalLight3D.new()
+    sun.rotation_degrees = Vector3(-45, -30, 0)
+    sun.shadow_enabled = true
+    add_child(sun)
+
+    # 5. 카메라
+    var cam = Camera3D.new()
+    cam.position = Vector3(0, 5, 8)
+    cam.look_at(Vector3.ZERO, Vector3.UP)
+    cam.current = true
+    add_child(cam)
+
+func create_box(pos: Vector3, color: Color):
+    var box_node = MeshInstance3D.new()
+    var box = BoxMesh.new()
+    box.size = Vector3(1, 1, 1)
+    box_node.mesh = box
+    box_node.position = pos
+    var mat = StandardMaterial3D.new()
+    mat.albedo_color = color
+    box_node.material_override = mat
+    add_child(box_node)</code></pre>
+      </section>
+
+      <!-- Slide 17: 씬 트리 구조와 환경 -->
+      <section data-narration="실제 프로젝트에서는 코드 대신 에디터에서 씬을 구성하는 경우가 많습니다. 일반적인 3D 씬 트리 구조를 살펴보겠습니다. WorldEnvironment 노드를 추가하면 하늘, 안개, 톤매핑 등 환경 설정을 할 수 있습니다. Environment 리소스에서 배경 모드를 Sky로 설정하고 ProceduralSkyMaterial을 사용하면 절차적 하늘을 쉽게 만들 수 있습니다. 이 구조를 기본 템플릿으로 활용하세요.">
+        <h2>씬 트리 구조와 환경</h2>
+        <div class="two-columns">
+          <div>
+            <h3 style="color: var(--gd-blue);">권장 씬 트리</h3>
+            <pre><code class="language-gdscript"># 기본 3D 씬 구조
+Main (Node3D)
+  +-- WorldEnvironment
+  +-- DirectionalLight3D (태양)
+  +-- Camera3D
+  +-- Ground (MeshInstance3D)
+  |     +-- StaticBody3D
+  |           +-- CollisionShape3D
+  +-- Objects (Node3D)
+  |     +-- Box (MeshInstance3D)
+  |     +-- Sphere (MeshInstance3D)
+  +-- Player (CharacterBody3D)
+        +-- MeshInstance3D
+        +-- CollisionShape3D
+        +-- Camera3D</code></pre>
+          </div>
+          <div>
+            <h3 style="color: var(--gd-green);">WorldEnvironment</h3>
+            <pre><code class="language-gdscript"># 환경 설정 (코드)
+var world_env = WorldEnvironment.new()
+var env = Environment.new()
+
+# 하늘 설정
+env.background_mode = \
+    Environment.BG_SKY
+var sky = Sky.new()
+sky.sky_material = \
+    ProceduralSkyMaterial.new()
+env.sky = sky
+
+# 톤매핑
+env.tonemap_mode = \
+    Environment.TONE_MAP_ACES
+
+# 안개
+env.fog_enabled = true
+env.fog_light_color = Color(0.7, 0.8, 0.9)
+env.fog_density = 0.01
+
+world_env.environment = env
+add_child(world_env)</code></pre>
+          </div>
+        </div>
+        <div class="tip fragment">
+          <strong>에디터 팁:</strong> 3D 씬 생성 시 에디터 상단 메뉴에서 [환경 미리보기]와 [태양 미리보기]를 켜면 조명/환경 없이도 장면을 볼 수 있습니다. 단, 이것은 에디터 전용이므로 실제 게임에서는 반드시 조명과 환경을 추가하세요.
+        </div>
+      </section>
+
+      <!-- Slide 18: Chapter 13 정리 -->
+      <section data-narration="챕터 13에서 3D의 기초를 학습했습니다. Godot의 Y-up 오른손 좌표계, Node3D의 Transform과 Basis, MeshInstance3D와 프리미티브 메시로 물체를 만들고, Camera3D로 장면을 보고, 세 가지 조명으로 빛을 비추는 법을 배웠습니다. 또한 오일러와 쿼터니언 회전, look_at 함수, Vector3의 핵심 메서드도 익혔습니다. 다음 챕터에서는 3D 물리와 충돌을 학습합니다.">
+        <h2>Chapter 13 정리</h2>
+        <div class="key-point">
+          <h3>핵심 요약</h3>
+          <ul>
+            <li><strong>좌표계</strong>: Y-up 오른손 법칙, -Z가 앞 방향</li>
+            <li><strong>Node3D</strong>: position, rotation, scale / Transform3D + Basis</li>
+            <li><strong>MeshInstance3D</strong>: 프리미티브 메시(Box, Sphere, Cylinder 등)로 물체 표현</li>
+            <li><strong>Camera3D</strong>: Perspective(원근) / Orthogonal(직교) 투영</li>
+          </ul>
+        </div>
+        <table class="compare-table fragment" style="font-size: 0.75em;">
+          <tr><th>개념</th><th>핵심 내용</th></tr>
+          <tr><td>조명</td><td>Directional(태양), Omni(전구), Spot(손전등)</td></tr>
+          <tr><td>머티리얼</td><td>StandardMaterial3D - albedo, metallic, roughness</td></tr>
+          <tr><td>회전</td><td>Euler(직관적) vs Quaternion(보간용), look_at()</td></tr>
+          <tr><td>Vector3</td><td>normalized, distance_to, dot, cross, lerp</td></tr>
+          <tr><td>Basis</td><td>x=오른쪽, y=위, z=뒤 / -z=앞 방향</td></tr>
+          <tr><td>환경</td><td>WorldEnvironment + Sky + 톤매핑 + 안개</td></tr>
+        </table>
+        <div class="tip fragment">
+          <strong>다음 단계:</strong> 3D 공간에 물체를 배치했으니, 다음 챕터에서는 3D 물리 엔진과 충돌 시스템을 배워 물체가 떨어지고 부딪히는 세계를 만들어봅시다.
+        </div>
+      </section>
+
+      <!-- Slide 19 (end): Next Chapter -->
+      <section class="chapter-title" data-transition="zoom" data-narration="챕터 13 3D 기초 학습을 완료하셨습니다. 3D 좌표계, 메시, 카메라, 조명, 회전까지 3D 세계의 기본을 모두 익혔습니다. 다음 챕터에서는 3D 물리와 충돌을 다룹니다. StaticBody3D, RigidBody3D, CharacterBody3D 등 3D 물리 바디와 3D 충돌 형태, 레이캐스트까지 배우게 됩니다. 계속 진행해주세요.">
+        <span class="chapter-number">Next</span>
+        <h1>수고하셨습니다!</h1>
+        <br>
+        <p><a href="14-3d-physics.html" style="color: var(--gd-blue); font-size: 1.2em;">다음 챕터: 3D 물리와 충돌 &#8594;</a></p>
+        <br>
+        <p><a href="../index.html" style="color: #888; font-size: 0.7em;">&#8592; 목차로 돌아가기</a></p>
+      </section>
+
+    </div>
+  </div>
+  <div class="nav-footer"><a href="../index.html" style="color: #888;">Godot 초보부터 고수까지</a> | Chapter 13</div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/plugin/highlight/highlight.min.js"></script>
+  <script>
+    Reveal.initialize({ hash: true, slideNumber: true, plugins: [RevealHighlight], transition: 'slide', height: 700, center: false, margin: 0.04, minScale: 0.2, maxScale: 1.5, keyboard: { 38: null, 40: null }, mouseWheel: false });
+    document.addEventListener('keydown', function(e) { if (e.keyCode === 38 || e.keyCode === 40) { var slide = Reveal.getCurrentSlide(); if (!slide) return; var amount = 80; if (e.keyCode === 38) { slide.scrollTop -= amount; } else { slide.scrollTop += amount; } e.preventDefault(); e.stopPropagation(); } }, true);
+  </script>
+  <script src="js/narration.js"></script>
+</body>
+</html>

@@ -1,0 +1,1334 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 20: 3D 이펙트와 최적화 - Godot 초보부터 고수까지</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/theme/night.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/plugin/highlight/monokai.min.css">
+  <link rel="stylesheet" href="css/custom.css">
+  <link rel="stylesheet" href="css/narration.css">
+</head>
+<body>
+  <div class="reveal">
+    <div class="slides">
+
+      <!-- Slide 1: Title -->
+      <section class="chapter-title" data-transition="zoom" data-narration="마지막 챕터인 챕터 20에 오신 것을 환영합니다. 이번 챕터에서는 3D 게임에 생명을 불어넣는 파티클 이펙트, 데칼, 포그 등 시각 효과와 LOD, 오클루전 컬링, MultiMesh 등 성능 최적화 기법을 배웁니다. 그리고 Godot의 렌더링 파이프라인을 이해하며 전체 과정을 마무리합니다.">
+        <span class="chapter-number">Chapter 20</span>
+        <h1>3D 이펙트와 최적화</h1>
+        <p class="subtitle">파티클, 데칼, LOD, 오클루전 컬링, 렌더링 파이프라인</p>
+        <br>
+        <p><a href="../index.html" style="color: #888; font-size: 0.6em;">&#8592; 목차로 돌아가기</a></p>
+      </section>
+
+      <!-- Slide 2: GPUParticles3D -->
+      <section data-narration="GPUParticles3D는 GPU에서 수천 개의 파티클을 병렬 처리하는 3D 파티클 시스템입니다. 불꽃, 연기, 마법 효과, 비, 눈 등 다양한 시각 효과를 만들 수 있습니다. amount로 파티클 수를 설정하고, lifetime으로 수명을 지정합니다. ProcessMaterial에서 파티클의 움직임, 크기, 색상 변화를 세밀하게 제어합니다. one_shot으로 일회성 폭발 효과도 가능합니다.">
+        <h2>GPUParticles3D</h2>
+        <p><span class="badge badge-blue">GPU 파티클</span> 대량의 3D 파티클을 GPU로 고속 처리</p>
+        <div class="two-columns">
+          <div>
+            <h3 style="color: var(--gd-green);">기본 설정</h3>
+            <pre><code class="language-gdscript"># GPUParticles3D 주요 프로퍼티
+# amount: 파티클 수 (기본 8)
+# lifetime: 수명 (초)
+# one_shot: 일회성 발사
+# preprocess: 미리 시뮬레이션 시간
+# speed_scale: 속도 배율
+# explosiveness: 동시 발사 비율 (0~1)
+# randomness: 랜덤 비율
+# fixed_fps: 고정 FPS (0이면 무제한)
+# visibility_aabb: 가시 범위 바운딩 박스
+
+# 코드로 파티클 제어
+@onready var particles = $GPUParticles3D
+
+func play_explosion():
+    particles.one_shot = true
+    particles.explosiveness = 1.0
+    particles.amount = 100
+    particles.emitting = true
+
+func play_continuous():
+    particles.one_shot = false
+    particles.amount = 50
+    particles.emitting = true
+
+func stop():
+    particles.emitting = false</code></pre>
+          </div>
+          <div>
+            <h3 style="color: var(--gd-blue);">씬 트리 구성</h3>
+            <pre><code class="language-gdscript"># 파티클 씬 구성
+# FireEffect (GPUParticles3D)
+#   amount: 200
+#   lifetime: 1.5
+#   process_material: ParticleProcessMaterial
+#   draw_pass_1: QuadMesh (또는 SphereMesh)
+
+# 파티클 생성 및 추가 (코드)
+func create_spark_effect(pos: Vector3):
+    var particles = GPUParticles3D.new()
+    particles.amount = 30
+    particles.lifetime = 0.5
+    particles.one_shot = true
+    particles.explosiveness = 0.9
+    particles.emitting = true
+
+    # 메시 설정
+    var mesh = QuadMesh.new()
+    mesh.size = Vector2(0.05, 0.05)
+    particles.draw_pass_1 = mesh
+
+    # 머티리얼 설정 (다음 슬라이드)
+    var mat = ParticleProcessMaterial.new()
+    particles.process_material = mat
+
+    particles.global_position = pos
+    add_child(particles)
+
+    # 자동 삭제
+    particles.finished.connect(
+        particles.queue_free
+    )</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 3: ParticleProcessMaterial 3D -->
+      <section data-narration="ParticleProcessMaterial은 파티클의 물리적 행동과 시각적 변화를 정의하는 머티리얼입니다. 초기 속도, 중력, 방향, 스프레드 각도로 파티클 움직임을 제어합니다. 시간에 따른 크기 변화 커브, 색상 그라디언트, 회전 등으로 풍부한 시각 효과를 만듭니다. 3D에서는 특히 중력 방향과 감쇠 설정이 현실감에 큰 영향을 줍니다.">
+        <h2>ParticleProcessMaterial 3D</h2>
+        <p>파티클의 움직임, 크기, 색상을 세밀하게 제어</p>
+        <div class="two-columns">
+          <div>
+            <h3 style="color: var(--gd-green);">불꽃 이펙트</h3>
+            <pre><code class="language-gdscript"># 불꽃 파티클 머티리얼
+func create_fire_material() -&gt; ParticleProcessMaterial:
+    var mat = ParticleProcessMaterial.new()
+
+    # 방향과 확산
+    mat.direction = Vector3(0, 1, 0)
+    mat.spread = 15.0  # 확산 각도
+    mat.initial_velocity_min = 2.0
+    mat.initial_velocity_max = 4.0
+
+    # 중력
+    mat.gravity = Vector3(0, -0.5, 0)
+
+    # 크기 변화 (커브)
+    var size_curve = CurveTexture.new()
+    var curve = Curve.new()
+    curve.add_point(Vector2(0, 0.5))
+    curve.add_point(Vector2(0.3, 1.0))
+    curve.add_point(Vector2(1, 0))
+    size_curve.curve = curve
+    mat.scale_curve = size_curve
+    mat.scale_min = 0.3
+    mat.scale_max = 0.8
+
+    # 색상 변화 (그라디언트)
+    var gradient = GradientTexture1D.new()
+    var grad = Gradient.new()
+    grad.colors = [
+        Color(1, 1, 0.3, 1),   # 노란 불꽃
+        Color(1, 0.4, 0, 1),   # 주황
+        Color(0.5, 0, 0, 0.5), # 어두운 빨강
+        Color(0.2, 0.2, 0.2, 0) # 투명 연기
+    ]
+    gradient.gradient = grad
+    mat.color_ramp = gradient
+
+    return mat</code></pre>
+          </div>
+          <div>
+            <h3 style="color: var(--gd-blue);">주요 파라미터 정리</h3>
+            <table class="compare-table">
+              <tr>
+                <th>파라미터</th>
+                <th>설명</th>
+              </tr>
+              <tr>
+                <td>direction</td>
+                <td>파티클 방출 방향 (Vector3)</td>
+              </tr>
+              <tr>
+                <td>spread</td>
+                <td>확산 각도 (0~180도)</td>
+              </tr>
+              <tr>
+                <td>initial_velocity</td>
+                <td>초기 속도 (min/max)</td>
+              </tr>
+              <tr>
+                <td>gravity</td>
+                <td>중력 벡터</td>
+              </tr>
+              <tr>
+                <td>angular_velocity</td>
+                <td>회전 속도 (min/max)</td>
+              </tr>
+              <tr>
+                <td>linear_accel</td>
+                <td>선형 가속도</td>
+              </tr>
+              <tr>
+                <td>damping</td>
+                <td>감속 (공기저항)</td>
+              </tr>
+              <tr>
+                <td>scale_min/max</td>
+                <td>크기 범위</td>
+              </tr>
+              <tr>
+                <td>color_ramp</td>
+                <td>수명에 따른 색상 변화</td>
+              </tr>
+              <tr>
+                <td>scale_curve</td>
+                <td>수명에 따른 크기 변화</td>
+              </tr>
+              <tr>
+                <td>emission_shape</td>
+                <td>발사 형태 (점/구/박스 등)</td>
+              </tr>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 4: 3D 파티클 이미터 형태 -->
+      <section data-narration="파티클 이미터의 형태는 파티클이 어디에서 생성되는지를 결정합니다. 기본 Point는 한 점에서, Sphere는 구 표면이나 내부에서, Box는 직육면체 영역에서 파티클이 발생합니다. Ring은 원형 영역에서 발사되어 마법진이나 포탈 효과에 적합합니다. 3D에서는 Mesh 형태로 특정 메시의 표면에서 파티클을 발사하여 오브젝트가 타거나 빛나는 효과를 만들 수 있습니다.">
+        <h2>3D 파티클 이미터 형태</h2>
+        <p>파티클 생성 영역의 모양을 설정</p>
+        <div class="two-columns">
+          <div>
+            <h3 style="color: var(--gd-green);">이미터 형태 종류</h3>
+            <table class="compare-table">
+              <tr>
+                <th>형태</th>
+                <th>설명</th>
+                <th>활용 예시</th>
+              </tr>
+              <tr>
+                <td>Point</td>
+                <td>한 점에서 발사</td>
+                <td>스파크, 총구 화염</td>
+              </tr>
+              <tr>
+                <td>Sphere</td>
+                <td>구 표면/내부에서 발사</td>
+                <td>폭발, 힐링 오라</td>
+              </tr>
+              <tr>
+                <td>Sphere Surface</td>
+                <td>구 표면에서만 발사</td>
+                <td>쉴드 이펙트</td>
+              </tr>
+              <tr>
+                <td>Box</td>
+                <td>직육면체 영역에서 발사</td>
+                <td>비, 눈, 영역 효과</td>
+              </tr>
+              <tr>
+                <td>Ring</td>
+                <td>원형/도넛 영역에서 발사</td>
+                <td>마법진, 포탈</td>
+              </tr>
+              <tr>
+                <td>Points / Directed Points</td>
+                <td>정의된 점/방향에서 발사</td>
+                <td>메시 표면 효과</td>
+              </tr>
+            </table>
+          </div>
+          <div>
+            <h3 style="color: var(--gd-blue);">이미터 설정 코드</h3>
+            <pre><code class="language-gdscript"># 다양한 이미터 형태 설정
+func setup_sphere_emitter(mat: ParticleProcessMaterial):
+    mat.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_SPHERE
+    mat.emission_sphere_radius = 2.0
+
+func setup_box_emitter(mat: ParticleProcessMaterial):
+    mat.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
+    mat.emission_box_extents = Vector3(5, 0.1, 5)
+
+func setup_ring_emitter(mat: ParticleProcessMaterial):
+    mat.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_RING
+    mat.emission_ring_radius = 3.0
+    mat.emission_ring_inner_radius = 2.5
+    mat.emission_ring_height = 0.1
+    mat.emission_ring_axis = Vector3(0, 1, 0)
+
+# 비 이펙트: Box 이미터 활용
+func create_rain():
+    var particles = GPUParticles3D.new()
+    particles.amount = 500
+    particles.lifetime = 2.0
+    var mat = ParticleProcessMaterial.new()
+    mat.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
+    mat.emission_box_extents = Vector3(20, 0, 20)
+    mat.gravity = Vector3(0, -15, 0)
+    mat.direction = Vector3(0, -1, 0)
+    mat.initial_velocity_min = 5.0
+    mat.initial_velocity_max = 8.0
+    particles.process_material = mat
+    particles.position.y = 15.0
+    add_child(particles)</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 5: 파티클 트레일 -->
+      <section data-narration="파티클 트레일은 각 파티클 뒤에 꼬리를 남기는 효과입니다. 총알 궤적, 마법 미사일, 유성 꼬리 등에 사용됩니다. GPUParticles3D의 trail_enabled를 활성화하고 trail_lifetime으로 꼬리 길이를 설정합니다. 드로우 패스에 RibbonTrailMesh나 TubeTrailMesh를 사용하면 각각 리본형, 튜브형 꼬리가 됩니다. 머티리얼의 color_ramp로 꼬리 색상이 점점 투명해지는 효과를 줍니다.">
+        <h2>파티클 트레일</h2>
+        <p><span class="badge badge-orange">꼬리 효과</span> 파티클 뒤에 리본/튜브형 궤적 생성</p>
+        <div class="two-columns">
+          <div>
+            <h3 style="color: var(--gd-green);">트레일 설정</h3>
+            <pre><code class="language-gdscript"># 파티클 트레일 활성화
+@onready var particles = $GPUParticles3D
+
+func setup_trail():
+    # 트레일 활성화
+    particles.trail_enabled = true
+    particles.trail_lifetime = 0.3  # 꼬리 길이 (초)
+
+    # 리본형 트레일 메시
+    var ribbon = RibbonTrailMesh.new()
+    ribbon.size = 0.1              # 리본 폭
+    ribbon.sections = 8            # 세그먼트 수
+    ribbon.section_length = 0.2    # 세그먼트 길이
+    ribbon.section_segments = 3
+    particles.draw_pass_1 = ribbon
+
+    # 또는 튜브형 트레일
+    # var tube = TubeTrailMesh.new()
+    # tube.radius = 0.05
+    # tube.sections = 8
+    # particles.draw_pass_1 = tube</code></pre>
+          </div>
+          <div>
+            <h3 style="color: var(--gd-blue);">마법 미사일 트레일 예시</h3>
+            <pre><code class="language-gdscript"># magic_missile_trail.gd
+func create_magic_trail() -&gt; GPUParticles3D:
+    var p = GPUParticles3D.new()
+    p.amount = 20
+    p.lifetime = 0.8
+    p.trail_enabled = true
+    p.trail_lifetime = 0.4
+
+    # 리본 메시
+    var ribbon = RibbonTrailMesh.new()
+    ribbon.size = 0.15
+    ribbon.sections = 6
+    p.draw_pass_1 = ribbon
+
+    # 머티리얼
+    var mat = ParticleProcessMaterial.new()
+    mat.direction = Vector3(0, 0, -1)
+    mat.initial_velocity_min = 0.5
+    mat.initial_velocity_max = 1.0
+    mat.gravity = Vector3.ZERO
+
+    # 색상: 밝은 파랑 -&gt; 투명
+    var grad_tex = GradientTexture1D.new()
+    var grad = Gradient.new()
+    grad.colors = [
+        Color(0.3, 0.7, 1, 1),
+        Color(0.1, 0.3, 1, 0)
+    ]
+    grad_tex.gradient = grad
+    mat.color_ramp = grad_tex
+
+    p.process_material = mat
+    return p</code></pre>
+            <div class="tip">
+              <strong>Tip:</strong> trail_lifetime은 파티클 lifetime보다 짧게 설정하세요. 너무 길면 GPU 부하가 커질 수 있습니다.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 6: GPUParticlesAttractor3D -->
+      <section data-narration="GPUParticlesAttractor3D는 파티클을 특정 지점으로 끌어당기거나 밀어내는 힘을 가하는 노드입니다. 아이템 흡수 효과, 블랙홀, 바람에 의한 파티클 편향 등을 만들 수 있습니다. Attractor의 strength가 양수이면 끌어당기고 음수이면 밀어냅니다. Box, Sphere, VectorField 세 가지 형태가 있으며, 감쇠 곡선으로 거리에 따른 힘의 변화를 조절합니다.">
+        <h2>GPUParticlesAttractor3D</h2>
+        <p><span class="badge badge-blue">파티클 흡인</span> 파티클을 끌어당기거나 밀어내는 힘</p>
+        <div class="two-columns">
+          <div>
+            <h3 style="color: var(--gd-green);">어트랙터 종류</h3>
+            <table class="compare-table">
+              <tr>
+                <th>노드</th>
+                <th>영향 범위</th>
+                <th>용도</th>
+              </tr>
+              <tr>
+                <td>GPUParticlesAttractorSphere3D</td>
+                <td>구형 영역</td>
+                <td>블랙홀, 아이템 흡수</td>
+              </tr>
+              <tr>
+                <td>GPUParticlesAttractorBox3D</td>
+                <td>박스 영역</td>
+                <td>바람 통로, 환기구</td>
+              </tr>
+              <tr>
+                <td>GPUParticlesAttractorVectorField3D</td>
+                <td>벡터 필드</td>
+                <td>복잡한 힘의 장</td>
+              </tr>
+            </table>
+            <div class="key-point">
+              <p><strong>strength</strong> 양수 = 끌어당김, 음수 = 밀어냄<br>
+              <strong>attenuation</strong> 거리에 따른 힘 감쇠 커브<br>
+              <strong>cull_mask</strong> 영향 받을 파티클 레이어</p>
+            </div>
+          </div>
+          <div>
+            <h3 style="color: var(--gd-blue);">코드 예시</h3>
+            <pre><code class="language-gdscript"># 아이템 흡수 효과
+func create_absorb_effect(target_pos: Vector3):
+    # 어트랙터 생성
+    var attractor = GPUParticlesAttractorSphere3D.new()
+    attractor.radius = 3.0
+    attractor.strength = 5.0
+    attractor.attenuation = 1.5
+    attractor.global_position = target_pos
+    add_child(attractor)
+
+    # 일정 시간 후 제거
+    await get_tree().create_timer(2.0).timeout
+    attractor.queue_free()
+
+# 바람 효과 (밀어내기)
+func create_wind_zone(pos: Vector3, size: Vector3):
+    var wind = GPUParticlesAttractorBox3D.new()
+    wind.size = size
+    wind.strength = -3.0  # 음수 = 밀어냄
+    wind.global_position = pos
+    add_child(wind)
+
+# 파티클에 어트랙터 영향 활성화
+# GPUParticles3D의 인스펙터에서:
+# interactable = true (기본값)
+# 어트랙터의 cull_mask와 파티클의
+# render layer가 일치해야 작동</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 7: GPUParticlesCollision3D -->
+      <section data-narration="GPUParticlesCollision3D는 파티클이 3D 환경과 충돌하도록 만드는 노드입니다. 바닥에 떨어지는 불꽃, 벽에 튕기는 스파크, 물 위에서 튀는 빗방울 등 물리적으로 사실적인 파티클 효과를 구현합니다. SDF(Signed Distance Field), Heightfield, Sphere 세 가지 형태가 있으며, SDF가 가장 정밀하지만 사전 베이킹이 필요합니다.">
+        <h2>GPUParticlesCollision3D</h2>
+        <p><span class="badge badge-green">파티클 충돌</span> 파티클이 환경 표면과 상호작용</p>
+        <div class="two-columns">
+          <div>
+            <h3 style="color: var(--gd-green);">충돌 노드 종류</h3>
+            <table class="compare-table">
+              <tr>
+                <th>노드</th>
+                <th>방식</th>
+                <th>특징</th>
+              </tr>
+              <tr>
+                <td>GPUParticlesCollisionSphere3D</td>
+                <td>구형 충돌</td>
+                <td>빠름, 단순한 형태</td>
+              </tr>
+              <tr>
+                <td>GPUParticlesCollisionBox3D</td>
+                <td>박스 충돌</td>
+                <td>평면/벽에 적합</td>
+              </tr>
+              <tr>
+                <td>GPUParticlesCollisionSDF3D</td>
+                <td>SDF 베이킹</td>
+                <td>정밀, 복잡한 형태</td>
+              </tr>
+              <tr>
+                <td>GPUParticlesCollisionHeightField3D</td>
+                <td>높이 필드</td>
+                <td>지형에 최적</td>
+              </tr>
+            </table>
+          </div>
+          <div>
+            <h3 style="color: var(--gd-blue);">SDF 충돌 설정</h3>
+            <pre><code class="language-gdscript"># 씬 트리 구성
+# Level (Node3D)
+#   +-- GPUParticlesCollisionSDF3D
+#   |     size: (20, 10, 20)
+#   |     resolution: 64
+#   |     (Bake SDF 버튼 클릭)
+#   +-- GPUParticles3D (불꽃)
+#   +-- MeshInstance3D (바닥)
+
+# ParticleProcessMaterial 충돌 설정
+func setup_collision_material(mat: ParticleProcessMaterial):
+    # 충돌 모드
+    mat.collision_mode = ParticleProcessMaterial.COLLISION_RIGID
+    # 반발 계수 (0=정지, 1=완전 반발)
+    mat.collision_bounce = 0.3
+    # 마찰 (0=미끄러움, 1=즉시 정지)
+    mat.collision_friction = 0.5
+    # 충돌 시 흡수 (파티클 제거 확률)
+    mat.collision_use_scale = true
+
+# HeightField: 실시간 지형 충돌
+# GPUParticlesCollisionHeightField3D
+#   follow_camera_enabled: true
+#   (카메라 주변 자동 업데이트)</code></pre>
+          </div>
+        </div>
+        <div class="tip">
+          <strong>권장 조합:</strong> 실내 레벨에는 SDF, 넓은 야외 지형에는 HeightField, 단순한 상호작용에는 Sphere/Box를 사용하세요.
+        </div>
+      </section>
+
+      <!-- Slide 8: CPUParticles3D vs GPU -->
+      <section data-narration="CPUParticles3D는 GPU 대신 CPU에서 파티클을 처리합니다. GPU 파티클보다 느리지만 호환성이 높고, 개별 파티클에 접근할 수 있으며, GPU가 약한 기기에서도 작동합니다. Compatibility 렌더러에서는 GPU 파티클 일부 기능이 제한되므로 CPUParticles3D가 대안이 됩니다. 소량의 파티클이나 정밀한 제어가 필요할 때 사용합니다.">
+        <h2>CPUParticles3D vs GPUParticles3D</h2>
+        <p>상황에 맞는 파티클 시스템 선택</p>
+        <table class="compare-table">
+          <tr>
+            <th>비교 항목</th>
+            <th>GPUParticles3D</th>
+            <th>CPUParticles3D</th>
+          </tr>
+          <tr>
+            <td>처리 위치</td>
+            <td>GPU (병렬 처리)</td>
+            <td>CPU (순차 처리)</td>
+          </tr>
+          <tr>
+            <td>최대 파티클 수</td>
+            <td>수십만 개 가능</td>
+            <td>수천 개 정도 권장</td>
+          </tr>
+          <tr>
+            <td>개별 파티클 접근</td>
+            <td style="color: var(--gd-red);">불가능</td>
+            <td style="color: var(--gd-green);">가능</td>
+          </tr>
+          <tr>
+            <td>어트랙터/충돌</td>
+            <td style="color: var(--gd-green);">전용 노드 지원</td>
+            <td style="color: var(--gd-red);">수동 구현 필요</td>
+          </tr>
+          <tr>
+            <td>트레일</td>
+            <td style="color: var(--gd-green);">지원</td>
+            <td style="color: var(--gd-red);">미지원</td>
+          </tr>
+          <tr>
+            <td>호환성</td>
+            <td>Forward+/Mobile 최적</td>
+            <td>모든 렌더러에서 동작</td>
+          </tr>
+          <tr>
+            <td>적합한 용도</td>
+            <td>대량 파티클, 시각 효과</td>
+            <td>소량, 정밀 제어, 저사양</td>
+          </tr>
+        </table>
+        <pre><code class="language-gdscript"># GPU 파티클을 CPU로 변환 (에디터 메뉴)
+# GPUParticles3D 선택 &gt; 메뉴 &gt; Convert to CPUParticles3D
+
+# CPUParticles3D 기본 사용법
+@onready var cpu_particles = $CPUParticles3D
+
+func _ready():
+    cpu_particles.amount = 50
+    cpu_particles.lifetime = 1.0
+    cpu_particles.direction = Vector3(0, 1, 0)
+    cpu_particles.gravity = Vector3(0, -9.8, 0)
+    cpu_particles.initial_velocity_min = 3.0
+    cpu_particles.initial_velocity_max = 5.0
+    cpu_particles.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+    cpu_particles.emission_sphere_radius = 0.5
+    cpu_particles.emitting = true</code></pre>
+      </section>
+
+      <!-- Slide 9: Decal 노드 -->
+      <section data-narration="Decal은 3D 표면에 텍스처를 투영하는 노드입니다. 총알 자국, 피 얼룩, 균열, 웅덩이 등 표면 위에 디테일을 추가할 때 사용합니다. 메시를 수정하지 않고 데칼을 올려놓기만 하면 되므로 동적으로 생성하기 쉽습니다. 알베도, 노멀, ORM 텍스처를 지원하여 질감까지 표현할 수 있습니다. cull_mask로 특정 오브젝트에만 데칼을 적용할 수 있습니다.">
+        <h2>Decal 노드</h2>
+        <p><span class="badge badge-orange">표면 효과</span> 3D 표면에 텍스처를 투영</p>
+        <div class="two-columns">
+          <div>
+            <h3 style="color: var(--gd-green);">Decal 주요 속성</h3>
+            <pre><code class="language-gdscript"># Decal 인스펙터 설정
+# size: Vector3(1, 2, 1)  - 투영 범위
+# texture_albedo: 알베도 텍스처
+# texture_normal: 노멀맵 텍스처
+# texture_orm: ORM(AO/Roughness/Metallic)
+# texture_emission: 이미시브 텍스처
+# modulate: Color(1,1,1,1) - 색상 조절
+# albedo_mix: 0.0~1.0 - 혼합 강도
+# upper_fade: 위쪽 페이드 (0~1)
+# lower_fade: 아래쪽 페이드 (0~1)
+# normal_fade: 노멀 기반 페이드
+# cull_mask: 적용 대상 레이어</code></pre>
+            <div class="key-point">
+              <p>Decal의 <strong>size.y</strong>는 투영 깊이입니다. 표면에 가까운 오브젝트만 영향받으므로 적절한 깊이를 설정하세요.</p>
+            </div>
+          </div>
+          <div>
+            <h3 style="color: var(--gd-blue);">동적 데칼 시스템</h3>
+            <pre><code class="language-gdscript"># bullet_decal.gd - 총알 자국 시스템
+extends Node3D
+
+@export var decal_texture: Texture2D
+@export var max_decals: int = 50
+var decal_pool: Array[Decal] = []
+var current_index: int = 0
+
+func _ready():
+    for i in max_decals:
+        var decal = Decal.new()
+        decal.size = Vector3(0.3, 0.5, 0.3)
+        decal.texture_albedo = decal_texture
+        decal.modulate = Color(1, 1, 1, 0.8)
+        decal.upper_fade = 0.3
+        decal.lower_fade = 0.3
+        decal.visible = false
+        add_child(decal)
+        decal_pool.append(decal)
+
+func spawn_decal(pos: Vector3, normal: Vector3):
+    var decal = decal_pool[current_index]
+    decal.global_position = pos + normal * 0.01
+    # 노멀 방향으로 데칼 정렬
+    if normal != Vector3.UP:
+        decal.look_at(pos + normal, Vector3.UP)
+    decal.visible = true
+    current_index = (current_index + 1) % max_decals
+
+    # 페이드 아웃 (선택)
+    var tween = create_tween()
+    tween.tween_property(decal, "modulate:a", 0.0, 10.0)</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 10: FogVolume -->
+      <section data-narration="FogVolume은 3D 공간에 부피감 있는 안개를 배치하는 노드입니다. 동굴 입구의 안개, 물 위의 수증기, 신비로운 분위기 연출 등에 사용합니다. FogMaterial로 밀도, 색상, 감쇠를 설정합니다. 여러 FogVolume을 배치하여 공간별로 다른 안개 밀도를 적용할 수 있습니다. 환경 설정의 Volumetric Fog와 함께 사용하면 광선이 안개를 통과하는 효과도 가능합니다.">
+        <h2>FogVolume</h2>
+        <p><span class="badge badge-blue">볼류메트릭 안개</span> 부피감 있는 3D 안개 효과</p>
+        <div class="two-columns">
+          <div>
+            <h3 style="color: var(--gd-green);">FogVolume 설정</h3>
+            <pre><code class="language-gdscript"># 씬 트리 구성
+# Level (Node3D)
+#   +-- WorldEnvironment
+#   |     Environment:
+#   |       volumetric_fog_enabled: true
+#   |       volumetric_fog_density: 0.02
+#   |       volumetric_fog_albedo: Color(0.8,0.8,0.9)
+#   +-- FogVolume (동굴 안개)
+#   |     size: Vector3(10, 3, 10)
+#   |     shape: Box
+#   |     material: FogMaterial
+#   +-- FogVolume2 (늪 안개)
+#         size: Vector3(20, 1, 20)
+#         shape: Ellipsoid
+
+# FogMaterial 속성
+# density: 0.5  (안개 밀도)
+# albedo: Color(0.7, 0.7, 0.8)
+# emission: Color(0, 0, 0) (자체 발광)
+# height_falloff: 1.0 (높이 감쇠)</code></pre>
+          </div>
+          <div>
+            <h3 style="color: var(--gd-blue);">코드로 안개 제어</h3>
+            <pre><code class="language-gdscript"># 동적 안개 밀도 변화
+@onready var fog_vol = $FogVolume
+@onready var env = $WorldEnvironment.environment
+
+func enter_cave():
+    var tween = create_tween()
+    # FogVolume 밀도 증가
+    var mat = fog_vol.material as FogMaterial
+    tween.tween_property(mat, "density", 1.0, 2.0)
+    # 전역 안개도 진하게
+    tween.parallel().tween_property(
+        env, "volumetric_fog_density", 0.08, 2.0
+    )
+
+func exit_cave():
+    var tween = create_tween()
+    var mat = fog_vol.material as FogMaterial
+    tween.tween_property(mat, "density", 0.1, 2.0)
+    tween.parallel().tween_property(
+        env, "volumetric_fog_density", 0.01, 2.0
+    )</code></pre>
+            <div class="warning">
+              <strong>성능:</strong> Volumetric Fog는 비용이 큽니다. 프로젝트 설정의 volumetric_fog_quality를 Low로 설정하거나, FogVolume 수를 최소화하세요.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 11: LOD(Level of Detail) 시스템 -->
+      <section data-narration="LOD는 카메라와의 거리에 따라 메시의 디테일 수준을 자동으로 변경하는 최적화 기법입니다. 가까이 있을 때는 고폴리곤 메시를, 멀리 있을 때는 저폴리곤 메시를 사용하여 렌더링 부하를 줄입니다. Godot 4는 메시를 임포트할 때 자동으로 LOD를 생성하는 기능이 있으며, lod_bias로 전환 거리를 조절합니다.">
+        <h2>LOD (Level of Detail)</h2>
+        <p><span class="badge badge-green">최적화</span> 거리에 따라 메시 디테일을 자동 조절</p>
+        <div class="two-columns">
+          <div>
+            <h3 style="color: var(--gd-green);">자동 LOD (메시 임포트)</h3>
+            <pre><code class="language-gdscript"># 메시 임포트 설정 (Advanced Import Settings)
+# Meshes &gt; LOD:
+#   lod_mode: "Generate"
+#   normal_merge_angle: 60
+#   normal_split_angle: 25
+
+# MeshInstance3D 인스펙터
+# lod_bias: 1.0  (기본값)
+#   값이 작을수록 빨리 저해상도로 전환
+#   0.5 = 기본 거리의 절반에서 전환
+#   2.0 = 기본 거리의 두 배에서 전환
+
+# 프로젝트 설정
+# Rendering &gt; Mesh LOD
+# lod_threshold: 1.0 (전체 LOD 감도)
+# mesh_lod_threshold: 1.0</code></pre>
+            <div class="key-point">
+              <p>glTF나 FBX 파일을 임포트할 때 LOD Generate를 활성화하면 Godot이 자동으로 여러 단계의 간소화된 메시를 생성합니다.</p>
+            </div>
+          </div>
+          <div>
+            <h3 style="color: var(--gd-blue);">수동 LOD 설정</h3>
+            <pre><code class="language-gdscript"># 수동 LOD: 여러 메시를 직접 관리
+# Tree (Node3D)
+#   +-- TreeHigh (MeshInstance3D)  [5000 poly]
+#   +-- TreeMed (MeshInstance3D)   [1000 poly]
+#   +-- TreeLow (MeshInstance3D)   [200 poly]
+#   +-- TreeBillboard (Sprite3D)   [2 poly]
+
+extends Node3D
+
+@onready var meshes = [$TreeHigh, $TreeMed, $TreeLow, $TreeBillboard]
+var lod_distances = [0, 20, 50, 100]
+
+func _process(delta):
+    var cam = get_viewport().get_camera_3d()
+    if not cam:
+        return
+    var dist = global_position.distance_to(
+        cam.global_position
+    )
+    for i in meshes.size():
+        var next_dist = lod_distances[i + 1] if i + 1 &lt; lod_distances.size() else INF
+        meshes[i].visible = (dist &gt;= lod_distances[i] and dist &lt; next_dist)</code></pre>
+            <div class="tip">
+              <strong>Tip:</strong> 가능하면 Godot의 자동 LOD를 사용하세요. 수동 LOD는 빌보드나 특수한 경우에만 필요합니다.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 12: HLOD -->
+      <section data-narration="HLOD는 Hierarchical Level of Detail의 약자로, 먼 거리에서 여러 오브젝트를 하나의 단순화된 메시로 합치는 기법입니다. 개별 LOD가 각 오브젝트의 디테일을 줄이는 것이라면, HLOD는 여러 오브젝트를 하나로 병합하여 draw call을 극적으로 줄입니다. 마을 전체가 멀리서 하나의 메시로 보이다가 가까이 가면 개별 건물로 분리되는 방식입니다.">
+        <h2>HLOD (Hierarchical LOD)</h2>
+        <p><span class="badge badge-blue">대규모 최적화</span> 먼 거리의 오브젝트 그룹을 하나로 병합</p>
+        <div class="two-columns">
+          <div>
+            <h3 style="color: var(--gd-green);">HLOD 개념</h3>
+            <div class="key-point">
+              <h3>LOD vs HLOD</h3>
+              <ul>
+                <li><strong>LOD:</strong> 개별 오브젝트의 폴리곤 수 감소</li>
+                <li><strong>HLOD:</strong> 오브젝트 그룹을 하나의 메시로 병합</li>
+                <li><strong>효과:</strong> draw call 수를 극적으로 감소</li>
+              </ul>
+            </div>
+            <pre><code class="language-gdscript"># HLOD 수동 구현 개념
+# Village (Node3D)
+#   +-- VillageLOD (MeshInstance3D)
+#         [마을 전체의 단순화 메시]
+#         visibility_range_begin: 100
+#   +-- Buildings (Node3D)
+#         visibility_range_end: 120
+#         +-- House1 (MeshInstance3D)
+#         +-- House2 (MeshInstance3D)
+#         +-- Shop (MeshInstance3D)
+#         +-- Church (MeshInstance3D)</code></pre>
+          </div>
+          <div>
+            <h3 style="color: var(--gd-blue);">Godot에서 HLOD 구현</h3>
+            <pre><code class="language-gdscript"># hlod_group.gd - 간단한 HLOD 관리
+extends Node3D
+
+@export var proxy_mesh: MeshInstance3D
+@export var detail_group: Node3D
+@export var switch_distance: float = 100.0
+@export var fade_range: float = 20.0
+
+func _process(delta):
+    var cam = get_viewport().get_camera_3d()
+    if not cam:
+        return
+    var dist = global_position.distance_to(
+        cam.global_position
+    )
+
+    if dist &gt; switch_distance + fade_range:
+        # 먼 거리: 프록시 메시만 표시
+        proxy_mesh.visible = true
+        detail_group.visible = false
+    elif dist &lt; switch_distance:
+        # 가까운 거리: 개별 메시 표시
+        proxy_mesh.visible = false
+        detail_group.visible = true
+    else:
+        # 전환 구간: 둘 다 표시 (크로스페이드)
+        proxy_mesh.visible = true
+        detail_group.visible = true
+        var t = (dist - switch_distance) / fade_range
+        proxy_mesh.transparency = 1.0 - t</code></pre>
+            <div class="tip">
+              <strong>Tip:</strong> HLOD 프록시 메시는 Blender 등에서 Decimate 도구로 만들거나, MeshInstance3D를 병합한 뒤 단순화합니다.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 13: Visibility Range -->
+      <section data-narration="Visibility Range는 GeometryInstance3D의 내장 기능으로, 카메라 거리에 따라 노드의 표시/숨김을 자동 관리합니다. visibility_range_begin과 end를 설정하면 해당 범위에서만 오브젝트가 보입니다. 페이드 모드를 설정하면 등장과 사라짐이 부드럽게 전환됩니다. LOD 체인을 직접 구성할 때 이 기능을 활용하면 코드 없이도 거리 기반 전환이 가능합니다.">
+        <h2>Visibility Range</h2>
+        <p><span class="badge badge-green">거리 기반 표시</span> 카메라 거리에 따른 자동 표시/숨김</p>
+        <div class="two-columns">
+          <div>
+            <h3 style="color: var(--gd-green);">설정 방법</h3>
+            <pre><code class="language-gdscript"># MeshInstance3D 인스펙터
+# Visibility Range:
+#   Begin: 0      (이 거리부터 보임)
+#   Begin Margin: 1  (페이드 인 범위)
+#   End: 50       (이 거리에서 사라짐)
+#   End Margin: 5    (페이드 아웃 범위)
+#   Fade Mode: Dependencies
+
+# LOD 체인 구성 예시:
+# Rock (Node3D)
+#   +-- RockHigh (MeshInstance3D)
+#         begin: 0, end: 30
+#   +-- RockMed (MeshInstance3D)
+#         begin: 25, end: 60
+#   +-- RockLow (MeshInstance3D)
+#         begin: 55, end: 120</code></pre>
+            <div class="key-point">
+              <h3>Fade Mode</h3>
+              <ul>
+                <li><strong>Disabled:</strong> 즉시 전환 (팝핑 발생)</li>
+                <li><strong>Self:</strong> 자체 투명도로 페이드</li>
+                <li><strong>Dependencies:</strong> 연결된 LOD와 교차 페이드</li>
+              </ul>
+            </div>
+          </div>
+          <div>
+            <h3 style="color: var(--gd-blue);">코드로 설정</h3>
+            <pre><code class="language-gdscript"># visibility_range 코드 설정
+func setup_visibility_range(mesh: MeshInstance3D,
+    begin: float, end: float):
+    mesh.visibility_range_begin = begin
+    mesh.visibility_range_begin_margin = begin * 0.1
+    mesh.visibility_range_end = end
+    mesh.visibility_range_end_margin = end * 0.1
+    mesh.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_DEPENDENCIES
+
+# 대량의 풀/나무에 적용
+func setup_vegetation():
+    for grass in get_tree().get_nodes_in_group("grass"):
+        setup_visibility_range(grass, 0, 30)
+    for tree in get_tree().get_nodes_in_group("trees"):
+        setup_visibility_range(tree, 0, 100)
+    for rock in get_tree().get_nodes_in_group("rocks"):
+        setup_visibility_range(rock, 0, 80)</code></pre>
+            <div class="tip">
+              <strong>Tip:</strong> Begin과 End 사이에 Margin 만큼의 페이드 구간이 생깁니다. Margin을 너무 크게 하면 투명 오브젝트가 많아져 오히려 성능이 떨어질 수 있습니다.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 14: Occlusion Culling -->
+      <section data-narration="오클루전 컬링은 다른 오브젝트에 가려져 보이지 않는 오브젝트를 렌더링에서 제외하는 최적화 기법입니다. 벽 뒤의 오브젝트, 건물 안의 가구 등을 GPU에 보내지 않아 성능이 크게 향상됩니다. Godot 4에서는 OccluderInstance3D 노드를 배치하여 차폐체를 정의합니다. 프로젝트 설정에서 오클루전 컬링을 활성화해야 작동합니다.">
+        <h2>Occlusion Culling</h2>
+        <p><span class="badge badge-red">핵심 최적화</span> 가려진 오브젝트의 렌더링을 건너뜀</p>
+        <div class="two-columns">
+          <div>
+            <h3 style="color: var(--gd-green);">오클루전 컬링 원리</h3>
+            <div class="key-point">
+              <h3>작동 방식</h3>
+              <ol>
+                <li><strong>Occluder</strong>: 차폐체 (벽, 큰 건물)</li>
+                <li>카메라 시점에서 차폐체를 렌더링</li>
+                <li>차폐체 뒤의 오브젝트 AABB 테스트</li>
+                <li>완전히 가려진 오브젝트 렌더링 제외</li>
+              </ol>
+            </div>
+            <pre><code class="language-gdscript"># 프로젝트 설정에서 활성화
+# Rendering &gt; Occlusion Culling
+#   use_occlusion_culling: true
+
+# 카메라에서도 활성화 필요
+# Camera3D 인스펙터:
+#   Attributes &gt; Occlusion Culling:
+#     enabled: true
+#     occlusion_culling_mode:
+#       "Automatic" (자동 jitter 보정)</code></pre>
+          </div>
+          <div>
+            <h3 style="color: var(--gd-blue);">코드 설정</h3>
+            <pre><code class="language-gdscript"># 오클루전 컬링 코드 활성화
+func _ready():
+    # 프로젝트 설정 코드 변경
+    ProjectSettings.set_setting(
+        "rendering/occlusion_culling/use_occlusion_culling",
+        true
+    )
+
+    # 카메라에서 오클루전 컬링 활성화
+    var camera = get_viewport().get_camera_3d()
+    # Camera3D의 attributes에서 설정
+
+# 오클루전 컬링 통계 확인
+func _process(delta):
+    var info = RenderingServer.get_rendering_info(
+        RenderingServer.RENDERING_INFO_OBJECTS_IN_FRAME
+    )
+    var culled = RenderingServer.get_rendering_info(
+        RenderingServer.RENDERING_INFO_TOTAL_OBJECTS_IN_FRAME
+    )
+    # 디버그 시각화:
+    # Viewport &gt; Debug Draw &gt; Occlusion Buffer</code></pre>
+            <div class="warning">
+              <strong>주의:</strong> 오클루전 컬링은 CPU 비용이 있습니다. 오브젝트 수가 적은 단순한 씬에서는 오히려 성능이 떨어질 수 있습니다. 실내 환경이나 복잡한 도시에서 효과적입니다.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 15: 오클루더 설정 -->
+      <section data-narration="OccluderInstance3D 노드에 오클루더 형태를 설정하여 어떤 표면이 차폐체 역할을 하는지 정의합니다. QuadOccluder3D는 평면 벽에, BoxOccluder3D는 건물에, SphereOccluder3D는 둥근 형태에, PolygonOccluder3D는 복잡한 형태에 사용합니다. 메시에서 자동 생성 기능을 사용하면 복잡한 지오메트리에 맞는 오클루더를 빠르게 만들 수 있습니다.">
+        <h2>오클루더 설정</h2>
+        <p>차폐체 형태를 정의하여 컬링 영역 설정</p>
+        <div class="two-columns">
+          <div>
+            <h3 style="color: var(--gd-green);">오클루더 종류</h3>
+            <table class="compare-table">
+              <tr>
+                <th>오클루더</th>
+                <th>형태</th>
+                <th>적합한 대상</th>
+              </tr>
+              <tr>
+                <td>QuadOccluder3D</td>
+                <td>사각 평면</td>
+                <td>벽, 바닥, 펜스</td>
+              </tr>
+              <tr>
+                <td>BoxOccluder3D</td>
+                <td>직육면체</td>
+                <td>건물, 큰 박스</td>
+              </tr>
+              <tr>
+                <td>SphereOccluder3D</td>
+                <td>구</td>
+                <td>둥근 구조물</td>
+              </tr>
+              <tr>
+                <td>PolygonOccluder3D</td>
+                <td>다각형 평면</td>
+                <td>복잡한 벽 형태</td>
+              </tr>
+            </table>
+            <pre><code class="language-gdscript"># 씬 트리 구성
+# Wall (MeshInstance3D)
+#   +-- OccluderInstance3D
+#         occluder: QuadOccluder3D
+#           size: Vector2(10, 3)
+# Building (MeshInstance3D)
+#   +-- OccluderInstance3D
+#         occluder: BoxOccluder3D
+#           size: Vector3(8, 6, 8)</code></pre>
+          </div>
+          <div>
+            <h3 style="color: var(--gd-blue);">자동 오클루더 생성</h3>
+            <pre><code class="language-gdscript"># MeshInstance3D에서 자동 생성
+# MeshInstance3D 선택 &gt; 메뉴 &gt;
+# Create Occluder For Mesh
+
+# 코드로 오클루더 설정
+func add_occluder_to_wall(wall: MeshInstance3D):
+    var occluder_inst = OccluderInstance3D.new()
+
+    var quad = QuadOccluder3D.new()
+    quad.size = Vector2(10, 3)
+    occluder_inst.occluder = quad
+
+    wall.add_child(occluder_inst)
+
+# bake_mask로 오클루더 레이어 관리
+func setup_occluder(occ: OccluderInstance3D):
+    # 특정 레이어의 지오메트리만
+    # 오클루전에 참여하도록 설정
+    occ.bake_mask = 1  # 레이어 1만</code></pre>
+            <div class="tip">
+              <strong>최적화 팁:</strong> 모든 벽에 오클루더를 넣을 필요는 없습니다. 큰 벽과 건물 등 많은 오브젝트를 가리는 표면에만 추가하세요. 작은 기둥이나 가구에는 불필요합니다.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 16: MultiMesh 최적화 -->
+      <section data-narration="MultiMesh는 동일한 메시를 수천 개 이상 효율적으로 렌더링하는 시스템입니다. 나무, 풀, 바위, 건물 등 같은 메시가 반복되는 경우 개별 MeshInstance3D 대신 MultiMeshInstance3D를 사용하면 하나의 draw call로 모든 인스턴스를 렌더링합니다. 각 인스턴스의 위치, 회전, 크기, 색상을 개별적으로 설정할 수 있습니다.">
+        <h2>MultiMesh 최적화</h2>
+        <p><span class="badge badge-blue">대량 렌더링</span> 동일 메시를 하나의 draw call로 수천 개 렌더링</p>
+        <div class="two-columns">
+          <div>
+            <h3 style="color: var(--gd-green);">MultiMesh 기본 사용법</h3>
+            <pre><code class="language-gdscript"># 풀밭 생성 예시
+extends MultiMeshInstance3D
+
+@export var grass_count: int = 10000
+@export var area_size: float = 50.0
+
+func _ready():
+    var mm = MultiMesh.new()
+    mm.transform_format = MultiMesh.TRANSFORM_3D
+    mm.use_colors = true
+    mm.mesh = preload("res://meshes/grass_blade.tres")
+    mm.instance_count = grass_count
+
+    for i in grass_count:
+        # 랜덤 위치
+        var pos = Vector3(
+            randf_range(-area_size, area_size),
+            0,
+            randf_range(-area_size, area_size)
+        )
+        # 랜덤 회전과 크기
+        var t = Transform3D.IDENTITY
+        t = t.rotated(Vector3.UP, randf() * TAU)
+        var s = randf_range(0.8, 1.2)
+        t = t.scaled(Vector3(s, s, s))
+        t.origin = pos
+        mm.set_instance_transform(i, t)
+
+        # 약간씩 다른 색상
+        var green = randf_range(0.4, 0.8)
+        mm.set_instance_color(i, Color(0.2, green, 0.1))
+
+    multimesh = mm</code></pre>
+          </div>
+          <div>
+            <h3 style="color: var(--gd-blue);">성능 비교</h3>
+            <table class="compare-table">
+              <tr>
+                <th>방식</th>
+                <th>1만 개 메시</th>
+                <th>Draw Calls</th>
+              </tr>
+              <tr>
+                <td>개별 MeshInstance3D</td>
+                <td style="color: var(--gd-red);">매우 느림</td>
+                <td style="color: var(--gd-red);">10,000</td>
+              </tr>
+              <tr>
+                <td>MultiMeshInstance3D</td>
+                <td style="color: var(--gd-green);">매우 빠름</td>
+                <td style="color: var(--gd-green);">1</td>
+              </tr>
+            </table>
+            <pre><code class="language-gdscript"># 런타임에 인스턴스 수정
+func wave_grass(time: float):
+    var mm = multimesh
+    for i in mm.instance_count:
+        var t = mm.get_instance_transform(i)
+        # 바람에 흔들리는 효과
+        var wave = sin(time * 2.0 + t.origin.x * 0.5)
+        t.basis = Basis.IDENTITY.rotated(
+            Vector3.RIGHT, wave * 0.1
+        )
+        mm.set_instance_transform(i, t)
+    # 주의: 매 프레임 전체 갱신은
+    # 인스턴스 수가 많으면 느림
+    # 셰이더로 바람 효과 구현 권장</code></pre>
+            <div class="tip">
+              <strong>Tip:</strong> MultiMesh의 visible_instance_count를 실제 필요한 수보다 작게 설정하면 일부만 렌더링할 수 있습니다. 동적으로 늘리거나 줄이는 것도 가능합니다.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 17: Draw Call 줄이기 -->
+      <section data-narration="Draw Call은 CPU가 GPU에 렌더링 명령을 보내는 횟수입니다. 3D에서는 메시, 머티리얼, 텍스처가 바뀔 때마다 새로운 draw call이 발생합니다. 같은 머티리얼을 사용하는 메시를 병합하고, 텍스처 아틀라스를 활용하며, MultiMesh로 반복 오브젝트를 처리하면 draw call을 크게 줄일 수 있습니다. 3D 성능의 가장 큰 병목 중 하나입니다.">
+        <h2>Draw Call 줄이기</h2>
+        <p><span class="badge badge-red">성능 핵심</span> GPU 명령 호출 횟수 최소화</p>
+        <div class="two-columns">
+          <div>
+            <h3 style="color: var(--gd-green);">최적화 전략</h3>
+            <div class="key-point">
+              <h3>Draw Call 감소 기법</h3>
+              <ol>
+                <li><strong>머티리얼 공유</strong> - 동일 머티리얼을 여러 메시에 재사용</li>
+                <li><strong>메시 병합</strong> - 정적 오브젝트를 하나의 메시로 합침</li>
+                <li><strong>텍스처 아틀라스</strong> - 여러 텍스처를 하나의 큰 텍스처에 합침</li>
+                <li><strong>MultiMesh</strong> - 반복 오브젝트 인스턴싱</li>
+                <li><strong>LOD/HLOD</strong> - 먼 거리 오브젝트 단순화/병합</li>
+                <li><strong>Visibility Range</strong> - 보이지 않는 오브젝트 제외</li>
+              </ol>
+            </div>
+          </div>
+          <div>
+            <h3 style="color: var(--gd-blue);">메시 병합 코드</h3>
+            <pre><code class="language-gdscript"># 정적 오브젝트 메시 병합
+func merge_static_meshes(parent: Node3D):
+    var surfaces_tool = SurfaceTool.new()
+    surfaces_tool.begin(Mesh.PRIMITIVE_TRIANGLES)
+
+    for child in parent.get_children():
+        if child is MeshInstance3D:
+            var mesh = child.mesh
+            for surf_idx in mesh.get_surface_count():
+                surfaces_tool.append_from(
+                    mesh, surf_idx, child.transform
+                )
+
+    surfaces_tool.generate_normals()
+    var merged_mesh = surfaces_tool.commit()
+
+    # 병합된 메시 노드 생성
+    var merged = MeshInstance3D.new()
+    merged.mesh = merged_mesh
+    parent.get_parent().add_child(merged)
+
+    # 원본 제거
+    parent.queue_free()</code></pre>
+            <div class="warning">
+              <strong>주의:</strong> 메시 병합은 정적(움직이지 않는) 오브젝트에만 적용하세요. 병합하면 개별 오브젝트의 컬링이 불가능해지므로 너무 넓은 범위를 병합하면 오히려 역효과입니다.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 18: 3D 성능 프로파일링 -->
+      <section data-narration="3D 성능 문제를 진단하려면 Godot의 내장 프로파일러와 디버그 드로우 도구를 활용합니다. Viewport의 Debug Draw 모드로 와이어프레임, 오버드로우, 라이팅 등을 시각화할 수 있습니다. 모니터 패널에서 FPS, draw call, 오브젝트 수를 실시간 모니터링하고, 프로파일러 탭에서 병목 함수를 찾습니다. GPU 부하인지 CPU 부하인지 구분하는 것이 해결의 첫걸음입니다.">
+        <h2>3D 성능 프로파일링</h2>
+        <p>병목 구간을 찾고 최적화 우선순위 결정</p>
+        <div class="two-columns">
+          <div>
+            <h3 style="color: var(--gd-green);">Debug Draw 모드</h3>
+            <pre><code class="language-gdscript"># Viewport Debug Draw 모드 전환
+func toggle_debug_draw():
+    var vp = get_viewport()
+    match vp.debug_draw:
+        Viewport.DEBUG_DRAW_DISABLED:
+            vp.debug_draw = Viewport.DEBUG_DRAW_WIREFRAME
+        Viewport.DEBUG_DRAW_WIREFRAME:
+            vp.debug_draw = Viewport.DEBUG_DRAW_OVERDRAW
+        Viewport.DEBUG_DRAW_OVERDRAW:
+            vp.debug_draw = Viewport.DEBUG_DRAW_UNSHADED
+        _:
+            vp.debug_draw = Viewport.DEBUG_DRAW_DISABLED
+
+# 주요 Debug Draw 모드:
+# WIREFRAME - 와이어프레임 (폴리곤 수 확인)
+# OVERDRAW - 오버드로우 (겹쳐 그리는 영역)
+# UNSHADED - 조명 없이 (셰이딩 비용 제거)
+# LIGHTING - 조명만 표시
+# NORMAL_BUFFER - 노멀 확인
+# OCCLUDERS - 오클루더 시각화</code></pre>
+          </div>
+          <div>
+            <h3 style="color: var(--gd-blue);">성능 지표 모니터링</h3>
+            <pre><code class="language-gdscript"># 실시간 성능 통계 표시
+extends CanvasLayer
+
+@onready var label = $Label
+
+func _process(delta):
+    var fps = Engine.get_frames_per_second()
+    var frame_time = 1000.0 / max(fps, 1)
+
+    var objects = RenderingServer.get_rendering_info(
+        RenderingServer.RENDERING_INFO_TOTAL_OBJECTS_IN_FRAME
+    )
+    var primitives = RenderingServer.get_rendering_info(
+        RenderingServer.RENDERING_INFO_TOTAL_PRIMITIVES_IN_FRAME
+    )
+    var draw_calls = RenderingServer.get_rendering_info(
+        RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME
+    )
+
+    label.text = "FPS: %d (%.1fms)\nObjects: %d\nPrimitives: %d\nDraw Calls: %d" % [
+        fps, frame_time, objects, primitives, draw_calls
+    ]</code></pre>
+            <table class="compare-table">
+              <tr>
+                <th>지표</th>
+                <th>양호</th>
+                <th style="color: var(--gd-red);">위험</th>
+              </tr>
+              <tr>
+                <td>FPS</td>
+                <td>60 안정</td>
+                <td>30 미만</td>
+              </tr>
+              <tr>
+                <td>Draw Calls</td>
+                <td>200 이하</td>
+                <td>1000 이상</td>
+              </tr>
+              <tr>
+                <td>Primitives</td>
+                <td>50만 이하</td>
+                <td>200만 이상</td>
+              </tr>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 19: 렌더링 파이프라인 (Forward+/Mobile/Compatibility) -->
+      <section data-narration="Godot 4는 세 가지 렌더링 파이프라인을 제공합니다. Forward+는 PC와 콘솔용 고품질 렌더러로, 무제한 조명, SDFGI, 볼류메트릭 포그 등 모든 기능을 지원합니다. Mobile은 모바일 기기에 최적화된 렌더러로 성능과 품질의 균형을 잡습니다. Compatibility는 OpenGL 3 기반으로 저사양 기기와 웹 플랫폼을 지원합니다. 프로젝트 대상 플랫폼에 맞는 렌더러를 선택하는 것이 중요합니다.">
+        <h2>렌더링 파이프라인</h2>
+        <p>Forward+, Mobile, Compatibility 렌더러 비교</p>
+        <table class="compare-table">
+          <tr>
+            <th>기능</th>
+            <th>Forward+</th>
+            <th>Mobile</th>
+            <th>Compatibility</th>
+          </tr>
+          <tr>
+            <td>API</td>
+            <td>Vulkan (RD)</td>
+            <td>Vulkan (RD)</td>
+            <td>OpenGL 3 / WebGL 2</td>
+          </tr>
+          <tr>
+            <td>대상 플랫폼</td>
+            <td>PC, 콘솔</td>
+            <td>모바일, 중간 PC</td>
+            <td>저사양, 웹, 구형 기기</td>
+          </tr>
+          <tr>
+            <td>조명 수</td>
+            <td>무제한 (클러스터)</td>
+            <td>8 옴니 + 8 스팟/메시</td>
+            <td>8 옴니 + 8 스팟/메시</td>
+          </tr>
+          <tr>
+            <td>GI 방식</td>
+            <td>SDFGI, VoxelGI, LightmapGI</td>
+            <td>LightmapGI</td>
+            <td>LightmapGI</td>
+          </tr>
+          <tr>
+            <td>Volumetric Fog</td>
+            <td style="color: var(--gd-green);">지원</td>
+            <td style="color: var(--gd-red);">미지원</td>
+            <td style="color: var(--gd-red);">미지원</td>
+          </tr>
+          <tr>
+            <td>GPU 파티클</td>
+            <td style="color: var(--gd-green);">전체 지원</td>
+            <td style="color: var(--gd-green);">지원</td>
+            <td>일부 제한</td>
+          </tr>
+          <tr>
+            <td>MSAA</td>
+            <td>2x, 4x, 8x</td>
+            <td>2x, 4x, 8x</td>
+            <td>2x, 4x, 8x</td>
+          </tr>
+          <tr>
+            <td>Decal</td>
+            <td style="color: var(--gd-green);">지원</td>
+            <td style="color: var(--gd-green);">지원</td>
+            <td style="color: var(--gd-red);">미지원</td>
+          </tr>
+        </table>
+        <pre><code class="language-gdscript"># 프로젝트 설정에서 렌더러 선택
+# Project Settings &gt; Rendering &gt; Renderer
+# rendering/renderer/rendering_method: "forward_plus" | "mobile" | "gl_compatibility"
+
+# 코드에서 렌더러 확인
+func check_renderer():
+    var renderer = ProjectSettings.get_setting("rendering/renderer/rendering_method")
+    print("현재 렌더러: ", renderer)
+
+    # 렌더러별 기능 분기
+    if renderer == "gl_compatibility":
+        # Compatibility에서는 Decal 대신 스프라이트 사용
+        use_sprite_decals()
+    else:
+        use_real_decals()</code></pre>
+      </section>
+
+      <!-- Slide 20: 전체 과정 정리 -->
+      <section data-narration="Godot 초보부터 고수까지 전체 20개 챕터의 학습 여정을 돌아봅니다. GDScript 기초부터 노드와 씬, 2D 게임, 물리, 시그널, UI, 애니메이션을 거쳐 3D 기초, 물리, 캐릭터 제어, 레벨 디자인, 이펙트와 최적화까지 게임 개발의 모든 기초와 실전 기법을 다루었습니다. 이 과정이 여러분의 게임 개발 여정에 단단한 기반이 되기를 바랍니다.">
+        <h2>전체 과정 정리</h2>
+        <p>20개 챕터 학습 여정 총정리</p>
+        <div class="two-columns">
+          <div>
+            <h3 style="color: var(--gd-green);">2D 기초 (Ch.01~12)</h3>
+            <table class="compare-table">
+              <tr><th>Ch</th><th>주제</th></tr>
+              <tr><td>01</td><td>Godot 엔진 소개</td></tr>
+              <tr><td>02</td><td>GDScript 기초</td></tr>
+              <tr><td>03</td><td>노드와 씬</td></tr>
+              <tr><td>04</td><td>2D 게임 기초</td></tr>
+              <tr><td>05</td><td>물리와 충돌</td></tr>
+              <tr><td>06</td><td>시그널과 그룹</td></tr>
+              <tr><td>07</td><td>UI 시스템</td></tr>
+              <tr><td>08</td><td>애니메이션</td></tr>
+              <tr><td>09</td><td>오디오와 파티클</td></tr>
+              <tr><td>10</td><td>타일맵과 레벨</td></tr>
+              <tr><td>11</td><td>리소스와 데이터</td></tr>
+              <tr><td>12</td><td>실전 프로젝트 패턴</td></tr>
+            </table>
+          </div>
+          <div>
+            <h3 style="color: var(--gd-blue);">3D 심화 (Ch.13~20)</h3>
+            <table class="compare-table">
+              <tr><th>Ch</th><th>주제</th></tr>
+              <tr><td>13</td><td>3D 기초</td></tr>
+              <tr><td>14</td><td>3D 물리와 충돌</td></tr>
+              <tr><td>15</td><td>3D 캐릭터 제어</td></tr>
+              <tr><td>16</td><td>3D 카메라와 환경</td></tr>
+              <tr><td>17</td><td>3D 조명과 그림자</td></tr>
+              <tr><td>18</td><td>3D 머티리얼과 셰이더</td></tr>
+              <tr><td>19</td><td>3D 레벨 디자인</td></tr>
+              <tr><td>20</td><td>3D 이펙트와 최적화</td></tr>
+            </table>
+            <div class="key-point">
+              <p>2D에서 탄탄한 기초를 다지고, 3D에서 공간 사고와 렌더링 최적화를 익혔습니다. 이제 여러분만의 게임을 만들 차례입니다!</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 21 (end): Complete! -->
+      <section class="chapter-title" data-transition="zoom" data-narration="축하합니다! Godot 초보부터 고수까지 전체 과정을 완료하셨습니다. 2D 기초부터 3D 심화까지 총 20개 챕터를 통해 게임 개발의 핵심 지식을 모두 다루었습니다. 이제 배운 것을 바탕으로 여러분만의 게임을 만들어보세요. 작은 프로젝트부터 시작해서 점점 규모를 키워가면 어느새 훌륭한 게임 개발자가 되어 있을 것입니다. 여러분의 게임 개발 여정을 응원합니다!">
+        <span class="chapter-number">Complete!</span>
+        <h1>축하합니다!</h1>
+        <p class="subtitle">Godot 2D + 3D 전 과정을 완료했습니다</p>
+        <br>
+        <p><a href="../index.html" style="color: var(--gd-blue); font-size: 1.2em;">&#8592; 목차로 돌아가기</a></p>
+      </section>
+
+    </div>
+  </div>
+  <div class="nav-footer"><a href="../index.html" style="color: #888;">Godot 초보부터 고수까지</a> | Chapter 20</div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/plugin/highlight/highlight.min.js"></script>
+  <script>
+    Reveal.initialize({ hash: true, slideNumber: true, plugins: [RevealHighlight], transition: 'slide', height: 700, center: false, margin: 0.04, minScale: 0.2, maxScale: 1.5, keyboard: { 38: null, 40: null }, mouseWheel: false });
+    document.addEventListener('keydown', function(e) { if (e.keyCode === 38 || e.keyCode === 40) { var slide = Reveal.getCurrentSlide(); if (!slide) return; var amount = 80; if (e.keyCode === 38) { slide.scrollTop -= amount; } else { slide.scrollTop += amount; } e.preventDefault(); e.stopPropagation(); } }, true);
+  </script>
+  <script src="js/narration.js"></script>
+</body>
+</html>

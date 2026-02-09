@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 14: 3D 물리와 충돌 - Godot 초보부터 고수까지</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/theme/night.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/plugin/highlight/monokai.min.css">
+  <link rel="stylesheet" href="css/custom.css">
+  <link rel="stylesheet" href="css/narration.css">
+</head>
+<body>
+  <div class="reveal">
+    <div class="slides">
+
+      <!-- Slide 1: Title -->
+      <section class="chapter-title" data-transition="zoom" data-narration="챕터 14에서는 3D 물리와 충돌 시스템을 학습합니다. 챕터 5에서 배운 2D 물리 개념이 3D로 확장됩니다. StaticBody3D, RigidBody3D, CharacterBody3D 등 3D 물리 바디와 다양한 3D 충돌 형태, 충돌 레이어와 마스크, RayCast3D, ShapeCast3D, 그리고 물리 머티리얼과 조인트까지 다룹니다. 3D 게임의 핵심인 물리 세계를 구축해봅시다.">
+        <span class="chapter-number">Chapter 14</span>
+        <h1>3D 물리와 충돌</h1>
+        <p class="subtitle">3D Physics Bodies, Collision Shapes, RayCast3D</p>
+        <br>
+        <p><a href="../index.html" style="color: #888; font-size: 0.6em;">&#8592; 목차로 돌아가기</a></p>
+      </section>
+
+      <!-- Slide 2: 3D 물리 개요 -->
+      <section data-narration="Godot 4는 기본 3D 물리 엔진인 GodotPhysics3D를 탑재하고 있으며, 프로젝트 설정에서 Jolt Physics로 교체할 수도 있습니다. Jolt는 더 정확하고 빠른 시뮬레이션을 제공하여 복잡한 3D 게임에 적합합니다. 3D 물리도 2D와 동일하게 초당 60회 고정 프레임으로 실행되며 중력은 기본 9.8 미터 기준입니다. 물리 바디의 종류도 2D와 동일한 세 가지입니다.">
+        <h2>3D 물리 개요</h2>
+        <div class="key-point">
+          <h3>Godot 4의 3D 물리 엔진</h3>
+          <p><strong>GodotPhysics3D</strong> (기본) 또는 <strong>Jolt Physics</strong> (확장) 중 선택 가능. 프로젝트 설정에서 변경합니다.</p>
+        </div>
+        <div class="two-columns">
+          <div>
+            <h3 style="color: var(--gd-blue);">엔진 비교</h3>
+            <table class="compare-table" style="font-size: 0.7em;">
+              <tr><th>항목</th><th>GodotPhysics3D</th><th>Jolt</th></tr>
+              <tr><td>설치</td><td>기본 내장</td><td>별도 활성화</td></tr>
+              <tr><td>정확도</td><td>보통</td><td>높음</td></tr>
+              <tr><td>성능</td><td>보통</td><td>우수</td></tr>
+              <tr><td>안정성</td><td>보통</td><td>높음</td></tr>
+              <tr><td>호환성</td><td>모든 플랫폼</td><td>대부분 플랫폼</td></tr>
+            </table>
+          </div>
+          <div>
+            <h3 style="color: var(--gd-green);">기본 설정</h3>
+            <pre><code class="language-gdscript"># 프로젝트 설정 (project.godot)
+# Physics &gt; 3D &gt; Physics Engine:
+#   GodotPhysics3D (기본)
+#   Jolt (4.4+에서 내장 옵션)
+
+# 기본 중력
+# physics/3d/default_gravity = 9.8
+# physics/3d/default_gravity_vector
+#   = (0, -1, 0)
+
+# 물리 프레임
+# physics/common/physics_ticks_per_second
+#   = 60</code></pre>
+          </div>
+        </div>
+        <div class="tip fragment">
+          <strong>Jolt 활성화:</strong> Godot 4.4 이상에서는 프로젝트 설정 Physics &gt; 3D &gt; Physics Engine에서 Jolt Physics를 직접 선택할 수 있습니다. 더 안정적인 물리 시뮬레이션이 필요하면 Jolt를 추천합니다.
+        </div>
+      </section>
+
+      <!-- Slide 3: StaticBody3D -->
+      <section data-narration="StaticBody3D는 3D 물리 세계에서 움직이지 않는 고정 물체입니다. 바닥, 벽, 건물, 지형 등 움직이지 않는 모든 환경 요소에 사용합니다. 반드시 자식으로 CollisionShape3D를 추가해야 물리 엔진이 인식합니다. MeshInstance3D는 시각적 표현이고 CollisionShape3D는 물리적 충돌 영역이므로 둘 다 필요합니다. 2D의 StaticBody2D와 동일한 개념이며 constant_linear_velocity로 컨베이어 벨트 효과도 가능합니다.">
+        <h2>StaticBody3D</h2>
+        <p><span class="badge badge-blue">고정 물체</span> 물리 세계에서 <strong>절대 움직이지 않는</strong> 3D 바디</p>
+        <div class="two-columns">
+          <div>
+            <h3>씬 트리 구조</h3>
+            <pre><code class="language-gdscript"># 바닥 구성
+Ground (StaticBody3D)
+  +-- MeshInstance3D (시각적 표현)
+  |     mesh = PlaneMesh (20x20)
+  +-- CollisionShape3D (물리 충돌)
+        shape = WorldBoundaryShape3D
+
+# 벽 구성
+Wall (StaticBody3D)
+  +-- MeshInstance3D
+  |     mesh = BoxMesh (10x3x0.5)
+  +-- CollisionShape3D
+        shape = BoxShape3D</code></pre>
+          </div>
+          <div>
+            <h3>코드로 생성</h3>
+            <pre><code class="language-gdscript"># 바닥 만들기
+func create_floor():
+    var body = StaticBody3D.new()
+
+    # 시각적 메시
+    var mesh_inst = MeshInstance3D.new()
+    var plane = PlaneMesh.new()
+    plane.size = Vector2(20, 20)
+    mesh_inst.mesh = plane
+    body.add_child(mesh_inst)
+
+    # 충돌 형태
+    var col = CollisionShape3D.new()
+    col.shape = WorldBoundaryShape3D.new()
+    body.add_child(col)
+
+    add_child(body)</code></pre>
+          </div>
+        </div>
+        <div class="warning fragment">
+          <strong>주의:</strong> MeshInstance3D만 추가하면 눈에는 보이지만 물리 충돌이 없습니다. 반드시 <code>CollisionShape3D</code>를 함께 추가하세요. 메시 선택 후 상단 메뉴 Mesh &gt; Create Trimesh/Convex Collision을 사용하면 자동 생성됩니다.
+        </div>
+      </section>
+
+      <!-- Slide 4: RigidBody3D -->
+      <section data-narration="RigidBody3D는 물리 법칙에 따라 자동으로 움직이는 3D 물체입니다. 중력에 의해 떨어지고, 다른 물체와 충돌하면 튕기며, 힘을 가하면 밀려납니다. mass는 질량으로 충돌 시 얼마나 밀리는지에 영향을 줍니다. gravity_scale로 중력 배율을 설정하고 angular_velocity로 회전 속도를 제어합니다. apply_impulse는 순간적인 힘, apply_force는 지속적인 힘을 가합니다.">
+        <h2>RigidBody3D</h2>
+        <p><span class="badge badge-green">물리 시뮬레이션</span> 중력, 충돌, 힘에 의해 <strong>자동으로 움직이는</strong> 바디</p>
+        <table class="compare-table" style="font-size: 0.8em;">
+          <tr><th>속성</th><th>타입</th><th>기본값</th><th>설명</th></tr>
+          <tr class="fragment"><td><code>mass</code></td><td>float</td><td>1.0</td><td>질량 (kg)</td></tr>
+          <tr class="fragment"><td><code>gravity_scale</code></td><td>float</td><td>1.0</td><td>중력 배율 (0=무중력)</td></tr>
+          <tr class="fragment"><td><code>linear_velocity</code></td><td>Vector3</td><td>(0,0,0)</td><td>이동 속도 (m/s)</td></tr>
+          <tr class="fragment"><td><code>angular_velocity</code></td><td>Vector3</td><td>(0,0,0)</td><td>각 축 회전 속도 (rad/s)</td></tr>
+          <tr class="fragment"><td><code>linear_damp</code></td><td>float</td><td>0.0</td><td>이동 감쇠 (공기 저항)</td></tr>
+          <tr class="fragment"><td><code>angular_damp</code></td><td>float</td><td>0.0</td><td>회전 감쇠</td></tr>
+        </table>
+        <pre class="fragment"><code class="language-gdscript">extends RigidBody3D
+
+func _ready():
+    mass = 5.0
+    # 위로 발사
+    linear_velocity = Vector3(0, 10, -5)
+
+func kick():
+    # 순간 충격 (impulse)
+    apply_impulse(Vector3(0, 8, -3))
+
+func push_forward():
+    # 지속적인 힘 (force) - _physics_process에서
+    apply_force(Vector3(0, 0, -50))
+
+func spin():
+    # 회전력 (torque)
+    apply_torque(Vector3(0, 10, 0))</code></pre>
+      </section>
+
+      <!-- Slide 5: CharacterBody3D -->
+      <section data-narration="CharacterBody3D는 코드로 직접 이동을 제어하는 3D 물리 바디입니다. 플레이어, NPC 등 게임 로직으로 움직이는 캐릭터에 사용합니다. velocity 속성에 이동 벡터를 설정하고 move_and_slide를 호출하면 충돌 처리가 자동으로 이루어집니다. floor_max_angle은 걸어 올라갈 수 있는 최대 경사각이고 wall_min_slide_angle은 벽을 따라 미끄러지는 최소 각도입니다. is_on_floor로 바닥 접촉 여부를 확인합니다.">
+        <h2>CharacterBody3D</h2>
+        <p><span class="badge badge-blue">코드 제어</span> 게임 로직으로 <strong>직접 이동</strong>하는 바디 (플레이어, NPC)</p>
+        <div class="two-columns">
+          <div>
+            <h3 style="color: var(--gd-blue);">주요 속성</h3>
+            <table class="compare-table" style="font-size: 0.7em;">
+              <tr><th>속성</th><th>기본값</th><th>설명</th></tr>
+              <tr><td><code>velocity</code></td><td>(0,0,0)</td><td>이동 속도 벡터</td></tr>
+              <tr><td><code>floor_max_angle</code></td><td>45도</td><td>바닥 판정 최대 경사</td></tr>
+              <tr><td><code>wall_min_slide_angle</code></td><td>15도</td><td>벽 미끄러짐 최소 각도</td></tr>
+              <tr><td><code>up_direction</code></td><td>(0,1,0)</td><td>위쪽 방향 정의</td></tr>
+              <tr><td><code>floor_snap_length</code></td><td>0.1</td><td>바닥 흡착 거리</td></tr>
+              <tr><td><code>max_slides</code></td><td>6</td><td>슬라이드 최대 반복</td></tr>
+            </table>
+          </div>
+          <div>
+            <h3 style="color: var(--gd-green);">기본 이동 코드</h3>
+            <pre><code class="language-gdscript">extends CharacterBody3D
+
+const SPEED = 5.0
+const GRAVITY = 9.8
+const JUMP_FORCE = 4.5
+
+func _physics_process(delta):
+    # 중력 적용
+    if not is_on_floor():
+        velocity.y -= GRAVITY * delta
+
+    # 점프
+    if Input.is_action_just_pressed("jump"):
+        if is_on_floor():
+            velocity.y = JUMP_FORCE
+
+    # 이동 입력
+    var input = Input.get_vector(
+        "left", "right", "forward", "back"
+    )
+    var direction = Vector3(
+        input.x, 0, input.y
+    ).normalized()
+
+    velocity.x = direction.x * SPEED
+    velocity.z = direction.z * SPEED
+
+    move_and_slide()</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 6: CharacterBody3D 상세 -->
+      <section data-narration="CharacterBody3D의 move_and_slide는 충돌 시 자동으로 미끄러짐 처리를 합니다. is_on_floor, is_on_wall, is_on_ceiling으로 어디에 닿아있는지 확인할 수 있습니다. get_slide_collision으로 충돌 정보를 가져와 충돌한 물체나 법선 벡터를 알 수 있습니다. 카메라 방향 기준으로 이동하려면 입력 벡터를 카메라의 basis로 변환해야 합니다. 이것은 3인칭 캐릭터 이동의 핵심 패턴입니다.">
+        <h2>CharacterBody3D 상세</h2>
+        <div class="two-columns">
+          <div>
+            <h3 style="color: var(--gd-blue);">충돌 판정 함수</h3>
+            <pre><code class="language-gdscript"># 접촉 상태 확인
+is_on_floor()    # 바닥 위?
+is_on_wall()     # 벽 접촉?
+is_on_ceiling()  # 천장 접촉?
+
+# 충돌 정보 가져오기
+var count = get_slide_collision_count()
+for i in count:
+    var col = get_slide_collision(i)
+    var collider = col.get_collider()
+    var normal = col.get_normal()
+    var pos = col.get_position()
+    print("충돌: ", collider.name)
+    print("법선: ", normal)</code></pre>
+          </div>
+          <div>
+            <h3 style="color: var(--gd-green);">카메라 기준 이동</h3>
+            <pre><code class="language-gdscript"># 카메라 방향 기준 이동 (3인칭)
+extends CharacterBody3D
+
+@onready var camera = $"../Camera3D"
+
+func get_camera_direction() -&gt; Vector3:
+    var input = Input.get_vector(
+        "left", "right", "forward", "back"
+    )
+
+    # 카메라의 앞/오른쪽 방향
+    var cam_forward = -camera.basis.z
+    var cam_right = camera.basis.x
+
+    # Y축 제거 (바닥 평면만)
+    cam_forward.y = 0
+    cam_right.y = 0
+    cam_forward = cam_forward.normalized()
+    cam_right = cam_right.normalized()
+
+    # 카메라 기준 방향으로 변환
+    return (cam_right * input.x + \
+        cam_forward * input.y).normalized()</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 7: Area3D -->
+      <section data-narration="Area3D는 3D 공간에서 물리 충돌 없이 영역 겹침만 감지하는 노드입니다. 2D의 Area2D와 동일한 개념으로 아이템 수집 범위, 데미지 존, 트리거 영역 등에 사용합니다. body_entered와 body_exited 시그널로 물리 바디의 진입과 이탈을 감지합니다. 또한 Area3D는 중력과 감쇠를 재정의할 수 있어 무중력 지대나 수중 영역처럼 물리 환경이 다른 구역을 만들 수 있습니다.">
+        <h2>Area3D</h2>
+        <p><span class="badge badge-green">영역 감지</span> 물리 충돌 없이 <strong>3D 영역 겹침</strong>을 감지하는 노드</p>
+        <div class="two-columns">
+          <div>
+            <h3>주요 용도</h3>
+            <ul>
+              <li class="fragment">아이템 수집 범위</li>
+              <li class="fragment">데미지 존 (함정, 용암)</li>
+              <li class="fragment">트리거 영역 (이벤트 발동)</li>
+              <li class="fragment">중력/물리 환경 재정의</li>
+              <li class="fragment">적 감지 범위 (AI 어그로)</li>
+            </ul>
+            <div class="key-point fragment">
+              <h3>중력 재정의</h3>
+              <pre><code class="language-gdscript"># Area3D 속성으로 설정:
+# gravity_space_override = REPLACE
+# gravity = 2.0  (약한 중력)
+# gravity_direction = (0, -1, 0)
+# linear_damp_space_override = REPLACE
+# linear_damp = 3.0  (물속 저항)</code></pre>
+            </div>
+          </div>
+          <div>
+            <h3>감지 코드</h3>
+            <pre><code class="language-gdscript">extends Area3D
+
+func _ready():
+    body_entered.connect(_on_body_entered)
+    body_exited.connect(_on_body_exited)
+
+func _on_body_entered(body: Node3D):
+    if body.is_in_group("player"):
+        print("플레이어 진입!")
+
+func _on_body_exited(body: Node3D):
+    if body.is_in_group("player"):
+        print("플레이어 이탈!")
+
+# Area3D 간 감지
+func _ready():
+    area_entered.connect(_on_area_entered)
+
+func _on_area_entered(area: Area3D):
+    if area.is_in_group("hitbox"):
+        take_damage(area.damage)
+
+# 겹쳐있는 바디 목록
+var bodies = get_overlapping_bodies()</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 8: CollisionShape3D -->
+      <section data-narration="CollisionShape3D는 3D 물리 바디의 충돌 영역을 정의하는 필수 자식 노드입니다. shape 속성에 3D Shape 리소스를 할당합니다. BoxShape3D는 상자형으로 벽과 바닥에 적합하고, SphereShape3D는 구형으로 가장 빠른 연산 속도를 제공합니다. CapsuleShape3D는 캐릭터에 가장 많이 사용되며, CylinderShape3D는 기둥이나 나무에 적합합니다. 복잡한 메시는 ConvexPolygonShape3D나 ConcavePolygonShape3D로 근사합니다.">
+        <h2>CollisionShape3D - 3D 충돌 형태</h2>
+        <p>물리 바디에 <strong>필수</strong>로 추가해야 하는 충돌 영역 정의 노드</p>
+        <table class="compare-table">
+          <tr><th>Shape</th><th>형태</th><th>용도</th><th>성능</th></tr>
+          <tr class="fragment"><td><code>BoxShape3D</code></td><td>상자</td><td>벽, 바닥, 상자, 건물</td><td>빠름</td></tr>
+          <tr class="fragment"><td><code>SphereShape3D</code></td><td>구</td><td>공, 총알, 구체</td><td>가장 빠름</td></tr>
+          <tr class="fragment"><td><code>CapsuleShape3D</code></td><td>캡슐</td><td>캐릭터, NPC</td><td>빠름</td></tr>
+          <tr class="fragment"><td><code>CylinderShape3D</code></td><td>원기둥</td><td>기둥, 나무, 항아리</td><td>보통</td></tr>
+          <tr class="fragment"><td><code>ConvexPolygonShape3D</code></td><td>볼록 다면체</td><td>커스텀 형태 (볼록)</td><td>느림</td></tr>
+          <tr class="fragment"><td><code>ConcavePolygonShape3D</code></td><td>오목 메시</td><td>복잡한 지형 (StaticBody만)</td><td>가장 느림</td></tr>
+          <tr class="fragment"><td><code>WorldBoundaryShape3D</code></td><td>무한 평면</td><td>바닥 (무한 크기)</td><td>빠름</td></tr>
+        </table>
+        <pre class="fragment"><code class="language-gdscript"># 코드로 충돌 형태 생성
+var col = CollisionShape3D.new()
+var capsule = CapsuleShape3D.new()
+capsule.radius = 0.4
+capsule.height = 1.8
+col.shape = capsule
+$CharacterBody3D.add_child(col)</code></pre>
+      </section>
+
+      <!-- Slide 9: 프리미티브 vs 메시 기반 충돌 -->
+      <section data-narration="충돌 형태를 선택할 때는 성능과 정확도 사이의 균형이 중요합니다. 프리미티브 Shape는 계산이 빠르지만 형태가 단순합니다. ConvexPolygonShape3D는 볼록한 형태만 표현할 수 있지만 프리미티브보다 유연합니다. ConcavePolygonShape3D는 어떤 형태든 표현하지만 StaticBody3D에서만 사용 가능하고 성능이 가장 느립니다. 움직이는 물체에는 프리미티브나 Convex를 사용하고 지형에만 Concave를 사용하세요.">
+        <h2>충돌 형태 선택 가이드</h2>
+        <div class="two-columns">
+          <div>
+            <h3 style="color: var(--gd-green);">프리미티브 (추천)</h3>
+            <pre><code class="language-gdscript"># 캐릭터 - 캡슐
+var capsule = CapsuleShape3D.new()
+capsule.radius = 0.4
+capsule.height = 1.8
+
+# 상자형 물체
+var box = BoxShape3D.new()
+box.size = Vector3(1, 1, 1)
+
+# 구형 물체
+var sphere = SphereShape3D.new()
+sphere.radius = 0.5
+
+# 원기둥
+var cylinder = CylinderShape3D.new()
+cylinder.radius = 0.3
+cylinder.height = 2.0</code></pre>
+            <p style="font-size: 0.8em;">빠르고 안정적. 대부분의 경우 충분합니다.</p>
+          </div>
+          <div>
+            <h3 style="color: var(--gd-orange);">메시 기반</h3>
+            <pre><code class="language-gdscript"># Convex - 볼록한 메시 (움직이는 물체 OK)
+# 에디터: MeshInstance3D 선택
+# 메뉴: Mesh &gt; Create Convex Collision
+
+# Concave - 정밀한 메시 (Static만!)
+# 에디터: MeshInstance3D 선택
+# 메뉴: Mesh &gt; Create Trimesh Collision
+
+# 코드로 메시에서 충돌 생성
+func auto_collision():
+    var mesh_inst = $MeshInstance3D
+    # 간단한 Convex 생성
+    mesh_inst.create_convex_collision()
+    # 정밀한 Trimesh 생성
+    mesh_inst.create_trimesh_collision()</code></pre>
+            <div class="warning">
+              <strong>ConcavePolygon</strong>은 <code>StaticBody3D</code>에서만 사용 가능합니다. RigidBody3D나 CharacterBody3D에서 사용하면 오류가 발생합니다.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 10: 충돌 레이어/마스크 3D -->
+      <section data-narration="3D의 충돌 레이어와 마스크는 2D와 완전히 동일한 개념입니다. Layer는 이 물체가 존재하는 층이고 Mask는 감지하려는 대상 층입니다. 프로젝트 설정에서 3D Physics 레이어에 이름을 지정하면 관리가 편해집니다. 3D 게임에서는 보통 플레이어, 적, 환경, 아이템, 투사체 등으로 레이어를 분리합니다. 코드에서 set_collision_layer_value와 set_collision_mask_value로 동적으로 변경할 수 있습니다.">
+        <h2>충돌 레이어/마스크 3D</h2>
+        <div class="key-point">
+          <h3>Layer vs Mask (2D와 동일한 개념)</h3>
+          <p><strong>Layer</strong> = 내가 존재하는 층 / <strong>Mask</strong> = 내가 감지할 대상 층</p>
+        </div>
+        <div class="two-columns">
+          <div>
+            <h3 style="color: var(--gd-blue);">레이어 구성 예시</h3>
+            <table class="compare-table" style="font-size: 0.7em;">
+              <tr><th>레이어</th><th>이름</th><th>대상</th></tr>
+              <tr><td>1</td><td>Environment</td><td>바닥, 벽, 지형</td></tr>
+              <tr><td>2</td><td>Player</td><td>플레이어</td></tr>
+              <tr><td>3</td><td>Enemy</td><td>적</td></tr>
+              <tr><td>4</td><td>Item</td><td>수집 아이템</td></tr>
+              <tr><td>5</td><td>Projectile</td><td>총알, 투사체</td></tr>
+              <tr><td>6</td><td>Trigger</td><td>트리거 영역</td></tr>
+            </table>
+          </div>
+          <div>
+            <h3 style="color: var(--gd-green);">설정 코드</h3>
+            <pre><code class="language-gdscript"># 플레이어 설정
+func setup_player_collision():
+    # 레이어 2 (Player)에 존재
+    set_collision_layer_value(2, true)
+    # 환경, 적, 아이템 감지
+    set_collision_mask_value(1, true)
+    set_collision_mask_value(3, true)
+    set_collision_mask_value(4, true)
+
+# 무적 상태 토글
+func set_invincible(on: bool):
+    set_collision_mask_value(3, not on)
+    set_collision_mask_value(5, not on)</code></pre>
+          </div>
+        </div>
+        <div class="tip fragment">
+          <strong>설정 위치:</strong> Project &gt; Project Settings &gt; Layer Names &gt; <strong>3D Physics</strong>에서 각 레이어에 이름을 지정하세요. 2D Physics와 별개의 설정입니다.
+        </div>
+      </section>
+
+      <!-- Slide 11: body_entered/exited 3D -->
+      <section data-narration="Area3D의 body_entered와 body_exited 시그널은 3D 물리 바디의 영역 진입과 이탈을 감지합니다. 2D와 사용법이 동일하며 매개변수로 Node3D를 받습니다. 영역 안에 머무르는 동안 지속적인 데미지를 주려면 Timer와 조합하거나, get_overlapping_bodies로 현재 영역 내 바디 목록을 확인합니다. Area3D끼리의 겹침은 area_entered와 area_exited로 감지합니다.">
+        <h2>body_entered / body_exited (3D)</h2>
+        <p><span class="badge badge-blue">Area3D 시그널</span> 물리 바디의 <strong>3D 영역 진입/이탈</strong> 감지</p>
+        <div class="two-columns">
+          <div>
+            <h3 style="color: var(--gd-blue);">기본 사용</h3>
+            <pre><code class="language-gdscript"># 데미지 존 (용암, 함정)
+extends Area3D
+
+@export var damage_per_second: float = 20.0
+var bodies_inside: Array[Node3D] = []
+
+func _ready():
+    body_entered.connect(_on_body_entered)
+    body_exited.connect(_on_body_exited)
+
+func _on_body_entered(body: Node3D):
+    if body.is_in_group("player"):
+        bodies_inside.append(body)
+
+func _on_body_exited(body: Node3D):
+    bodies_inside.erase(body)
+
+func _physics_process(delta):
+    for body in bodies_inside:
+        if body.has_method("take_damage"):
+            body.take_damage(
+                damage_per_second * delta
+            )</code></pre>
+          </div>
+          <div>
+            <h3 style="color: var(--gd-green);">이벤트 트리거</h3>
+            <pre><code class="language-gdscript"># 일회성 이벤트 트리거
+extends Area3D
+
+signal triggered
+var is_triggered := false
+
+func _ready():
+    body_entered.connect(_on_body_entered)
+
+func _on_body_entered(body: Node3D):
+    if is_triggered:
+        return
+    if body.is_in_group("player"):
+        is_triggered = true
+        triggered.emit()
+        # 컷씬 재생, 문 열기 등
+
+# 문 열기 트리거
+extends Area3D
+
+func _on_body_entered(body: Node3D):
+    if body.is_in_group("player"):
+        var door = get_parent()
+        var tween = create_tween()
+        tween.tween_property(
+            door, "position:y",
+            door.position.y + 3.0, 1.0
+        )</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 12: RayCast3D -->
+      <section data-narration="RayCast3D는 3D 공간에서 광선을 쏘아 가장 먼저 부딪히는 물체를 감지합니다. FPS 게임의 히트스캔 무기, 바닥 감지, 벽 감지, AI 시야 판정 등에 핵심적으로 사용됩니다. target_position으로 광선의 방향과 길이를 설정하고, is_colliding으로 충돌 여부를, get_collider로 충돌 대상을 가져옵니다. 3D에서는 광선 방향이 Vector3이므로 앞쪽 뒤쪽 아래쪽 등 모든 방향으로 설정할 수 있습니다.">
+        <h2>RayCast3D</h2>
+        <p><span class="badge badge-blue">광선 감지</span> 3D 공간에서 광선을 쏘아 <strong>첫 번째 충돌</strong>을 감지</p>
+        <pre><code class="language-gdscript">extends CharacterBody3D
+
+@onready var ray = $RayCast3D
+
+func _ready():
+    # 앞쪽으로 10유닛 광선
+    ray.target_position = Vector3(0, 0, -10)
+    ray.collision_mask = 0b00000110  # 레이어 2,3 감지
+
+func _physics_process(delta):
+    if ray.is_colliding():
+        var collider = ray.get_collider()
+        var point = ray.get_collision_point()
+        var normal = ray.get_collision_normal()
+
+        if collider.is_in_group("enemy"):
+            print("적 발견: %s (거리: %.1f)" % [
+                collider.name,
+                global_position.distance_to(point)
+            ])</code></pre>
+        <div class="two-columns fragment">
+          <div>
+            <h3 style="color: var(--gd-green);">FPS 히트스캔 무기</h3>
+            <pre><code class="language-gdscript"># 카메라 중앙에서 발사
+func shoot():
+    var cam = $Camera3D
+    var ray = $Camera3D/RayCast3D
+    ray.force_raycast_update()
+
+    if ray.is_colliding():
+        var target = ray.get_collider()
+        var hit_pos = ray.get_collision_point()
+        if target.has_method("take_damage"):
+            target.take_damage(25)</code></pre>
+          </div>
+          <div>
+            <h3 style="color: var(--gd-blue);">주요 속성</h3>
+            <ul>
+              <li><code>target_position</code> - 방향과 거리</li>
+              <li><code>collision_mask</code> - 감지 레이어</li>
+              <li><code>collide_with_areas</code> - Area 감지</li>
+              <li><code>collide_with_bodies</code> - Body 감지</li>
+              <li><code>hit_from_inside</code> - 내부 충돌</li>
+              <li><code>hit_back_faces</code> - 뒷면 감지</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 13: ShapeCast3D -->
+      <section data-narration="ShapeCast3D는 RayCast3D의 확장 버전으로, 가느다란 광선 대신 3D 도형을 밀어내며 경로 상의 모든 충돌을 감지합니다. 캐릭터 크기만큼의 이동 가능 여부를 확인하거나, 폭발 범위 내 물체를 한 번에 감지할 때 유용합니다. RayCast3D가 한 개의 충돌만 반환하는 것과 달리 ShapeCast3D는 여러 충돌을 모두 반환합니다. shape 속성에 충돌 검사에 사용할 도형을 설정합니다.">
+        <h2>ShapeCast3D</h2>
+        <p><span class="badge badge-green">도형 기반 감지</span> 3D 도형을 밀어내며 <strong>경로 상 모든 충돌</strong>을 감지</p>
+        <div class="two-columns">
+          <div>
+            <h3>RayCast3D vs ShapeCast3D</h3>
+            <table class="compare-table" style="font-size: 0.7em;">
+              <tr><th>구분</th><th>RayCast3D</th><th>ShapeCast3D</th></tr>
+              <tr><td>감지 범위</td><td>가느다란 선</td><td>도형 크기만큼</td></tr>
+              <tr><td>결과 수</td><td>1개</td><td>여러 개</td></tr>
+              <tr><td>성능</td><td>빠름</td><td>보통</td></tr>
+              <tr><td>용도</td><td>시선, 조준, 히트스캔</td><td>범위 감지, 이동 검사</td></tr>
+            </table>
+          </div>
+          <div>
+            <pre><code class="language-gdscript"># 폭발 범위 감지
+extends Node3D
+
+@onready var cast = $ShapeCast3D
+
+func explode():
+    # 구형 범위로 감지
+    cast.shape = SphereShape3D.new()
+    cast.shape.radius = 5.0
+    cast.target_position = Vector3.ZERO
+    cast.force_shapecast_update()
+
+    var count = cast.get_collision_count()
+    for i in count:
+        var obj = cast.get_collider(i)
+        if obj.has_method("take_damage"):
+            var dist = global_position.\
+                distance_to(obj.global_position)
+            var dmg = 100 * (1.0 - dist / 5.0)
+            obj.take_damage(dmg)</code></pre>
+          </div>
+        </div>
+        <div class="tip fragment">
+          <strong>활용:</strong> 캐릭터 크기의 ShapeCast를 이동 방향으로 쏘면 좁은 통로를 지나갈 수 있는지 미리 검사할 수 있습니다. 3인칭 카메라의 벽 관통 방지에도 유용합니다.
+        </div>
+      </section>
+
+      <!-- Slide 14: PhysicsMaterial (물리 머티리얼) -->
+      <section data-narration="PhysicsMaterial은 물리 바디의 마찰력과 반발력을 정의하는 리소스입니다. friction은 표면의 마찰 계수로 0이면 빙판처럼 미끄럽고 1이면 매우 거칠습니다. bounce는 반발 계수로 0이면 튕기지 않고 1이면 완전 탄성 충돌입니다. rough와 absorbent 속성으로 두 물체가 충돌할 때 어떤 값을 우선할지 결정합니다. 같은 공이라도 물리 머티리얼에 따라 완전히 다른 행동을 보여줍니다.">
+        <h2>PhysicsMaterial (물리 머티리얼)</h2>
+        <p><span class="badge badge-orange">물리 속성</span> 마찰력과 반발력을 정의하는 리소스</p>
+        <div class="two-columns">
+          <div>
+            <h3 style="color: var(--gd-blue);">속성</h3>
+            <table class="compare-table" style="font-size: 0.75em;">
+              <tr><th>속성</th><th>범위</th><th>설명</th></tr>
+              <tr><td><code>friction</code></td><td>0.0 ~ 1.0</td><td>마찰 계수 (0=빙판)</td></tr>
+              <tr><td><code>bounce</code></td><td>0.0 ~ 1.0</td><td>반발 계수 (1=완전 탄성)</td></tr>
+              <tr><td><code>rough</code></td><td>bool</td><td>마찰 우선 모드</td></tr>
+              <tr><td><code>absorbent</code></td><td>bool</td><td>반발 우선 모드</td></tr>
+            </table>
+            <h3 style="color: var(--gd-green);">재질 예시</h3>
+            <table class="compare-table" style="font-size: 0.7em;">
+              <tr><th>재질</th><th>friction</th><th>bounce</th></tr>
+              <tr><td>얼음</td><td>0.05</td><td>0.1</td></tr>
+              <tr><td>고무</td><td>0.8</td><td>0.8</td></tr>
+              <tr><td>나무</td><td>0.5</td><td>0.2</td></tr>
+              <tr><td>금속</td><td>0.3</td><td>0.3</td></tr>
+              <tr><td>탱탱볼</td><td>0.2</td><td>0.95</td></tr>
+            </table>
+          </div>
+          <div>
+            <pre><code class="language-gdscript"># 탱탱볼 만들기
+extends RigidBody3D
+
+func _ready():
+    var mat = PhysicsMaterial.new()
+    mat.bounce = 0.9
+    mat.friction = 0.2
+    physics_material_override = mat
+
+    # 위에서 떨어뜨리기
+    position = Vector3(0, 10, 0)
+
+# 빙판 바닥 만들기
+func create_ice_floor():
+    var body = StaticBody3D.new()
+    var mat = PhysicsMaterial.new()
+    mat.friction = 0.05
+    mat.bounce = 0.1
+    body.physics_material_override = mat
+    # ... 메시와 충돌 추가 ...
+
+# 런타임 재질 변경
+func make_slippery():
+    physics_material_override.friction = 0.0</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 15: Joint3D 개요 -->
+      <section data-narration="Joint3D는 두 물리 바디를 연결하는 조인트(관절)입니다. 경첩 문, 체인, 인형, 차량 서스펜션 등에 사용됩니다. Godot은 여러 종류의 3D 조인트를 제공합니다. PinJoint3D는 한 점에서 자유롭게 회전하는 볼 조인트, HingeJoint3D는 경첩처럼 한 축으로만 회전, SliderJoint3D는 한 축으로만 미끄러지는 조인트입니다. ConeTwistJoint3D와 Generic6DOFJoint3D는 더 복잡한 제약을 표현합니다.">
+        <h2>Joint3D (조인트) 개요</h2>
+        <p><span class="badge badge-blue">물리 연결</span> 두 물리 바디를 제약 조건으로 <strong>연결</strong>하는 노드</p>
+        <table class="compare-table" style="font-size: 0.8em;">
+          <tr><th>조인트</th><th>비유</th><th>자유도</th><th>용도</th></tr>
+          <tr class="fragment"><td><code>PinJoint3D</code></td><td>볼 조인트</td><td>3축 회전</td><td>진자, 매달린 물체</td></tr>
+          <tr class="fragment"><td><code>HingeJoint3D</code></td><td>경첩</td><td>1축 회전</td><td>문, 뚜껑</td></tr>
+          <tr class="fragment"><td><code>SliderJoint3D</code></td><td>레일</td><td>1축 이동</td><td>엘리베이터, 슬라이더</td></tr>
+          <tr class="fragment"><td><code>ConeTwistJoint3D</code></td><td>어깨 관절</td><td>제한된 3축</td><td>래그돌 관절</td></tr>
+          <tr class="fragment"><td><code>Generic6DOFJoint3D</code></td><td>범용</td><td>6자유도 커스텀</td><td>차량, 복잡한 기계</td></tr>
+        </table>
+        <pre class="fragment"><code class="language-gdscript"># 경첩 문 만들기
+# 씬 구조:
+# Door (Node3D)
+#   +-- HingeJoint3D
+#   +-- DoorBody (RigidBody3D)
+#   |     +-- MeshInstance3D
+#   |     +-- CollisionShape3D
+#   +-- WallAnchor (StaticBody3D)
+
+# HingeJoint3D 설정:
+#   node_a = WallAnchor (고정점)
+#   node_b = DoorBody   (움직이는 문)
+# 인스펙터에서 motor/limit 설정 가능</code></pre>
+      </section>
+
+      <!-- Slide 16: 트리거 영역 패턴 -->
+      <section data-narration="트리거 영역은 3D 게임에서 매우 자주 사용되는 패턴입니다. 플레이어가 특정 영역에 들어오면 이벤트를 발동시키는 구조입니다. 컷씬 시작, 스폰 영역, 체크포인트, 보스 방 진입 등에 활용됩니다. Area3D에 CollisionShape3D를 크게 설정하고 body_entered 시그널을 연결하면 됩니다. 일회성 트리거는 발동 후 비활성화하고, 반복 트리거는 쿨다운 타이머를 사용합니다.">
+        <h2>트리거 영역 패턴</h2>
+        <p><span class="badge badge-green">게임 디자인</span> 영역 진입 시 이벤트를 발동하는 패턴</p>
+        <div class="two-columns">
+          <div>
+            <h3 style="color: var(--gd-blue);">일회성 트리거</h3>
+            <pre><code class="language-gdscript"># 컷씬 트리거
+extends Area3D
+
+@export var cutscene_path: String
+
+var activated := false
+
+func _ready():
+    body_entered.connect(_on_entered)
+
+func _on_entered(body: Node3D):
+    if activated:
+        return
+    if not body.is_in_group("player"):
+        return
+
+    activated = true
+    # 컷씬 재생
+    CutsceneManager.play(cutscene_path)
+    # 트리거 비활성화
+    set_deferred("monitoring", false)</code></pre>
+          </div>
+          <div>
+            <h3 style="color: var(--gd-green);">체크포인트</h3>
+            <pre><code class="language-gdscript"># 체크포인트 영역
+extends Area3D
+
+@export var checkpoint_id: int = 0
+
+func _ready():
+    body_entered.connect(_on_entered)
+
+func _on_entered(body: Node3D):
+    if body.is_in_group("player"):
+        GameManager.set_checkpoint(
+            checkpoint_id,
+            global_position
+        )
+        # 시각 효과
+        $AnimationPlayer.play("activate")
+        $OmniLight3D.light_energy = 2.0
+
+# 킬 존 (낙사 처리)
+extends Area3D
+
+func _on_entered(body: Node3D):
+    if body.is_in_group("player"):
+        body.respawn_at_checkpoint()</code></pre>
+          </div>
+        </div>
+        <div class="tip fragment">
+          <strong>구조:</strong> Trigger (Area3D) &gt; CollisionShape3D (큰 영역). 레이어를 Trigger(6)에 두고, 마스크를 Player(2)만 감지하도록 설정하면 깔끔합니다.
+        </div>
+      </section>
+
+      <!-- Slide 17: 실전 - 3D 아이템 수집 -->
+      <section data-narration="지금까지 배운 3D 물리 개념을 종합하여 3D 아이템 수집 시스템을 만들어봅시다. 아이템은 Area3D로 만들어 플레이어가 근처에 오면 자동으로 끌려오는 자석 효과를 구현합니다. 외부 영역에 진입하면 흡인이 시작되고, 내부 영역에 도달하면 수집이 완료됩니다. 수집 시 점수가 증가하고 회전 및 떠다니는 애니메이션으로 시각적 매력을 더합니다.">
+        <h2>실전: 3D 아이템 수집</h2>
+        <p><span class="badge badge-green">종합 실습</span> Area3D + 자석 효과 + 수집 연출</p>
+        <pre><code class="language-gdscript"># collectible_3d.gd - 3D 수집 아이템
+extends Area3D
+
+@export var point_value: int = 10
+@export var magnet_range: float = 3.0
+@export var collect_range: float = 0.5
+@export var magnet_speed: float = 8.0
+@export var bob_height: float = 0.2
+@export var spin_speed: float = 2.0
+
+var is_collected := false
+var target_player: Node3D = null
+var base_y: float = 0.0
+var time: float = 0.0
+
+func _ready():
+    base_y = position.y
+    body_entered.connect(_on_body_entered)
+    # 자석 범위 설정
+    $CollisionShape3D.shape.radius = magnet_range
+
+func _on_body_entered(body: Node3D):
+    if body.is_in_group("player") and not is_collected:
+        target_player = body
+
+func _process(delta):
+    # 회전 + 떠다니는 연출
+    time += delta
+    $MeshInstance3D.rotation.y += spin_speed * delta
+    if target_player == null:
+        position.y = base_y + sin(time * 3.0) * bob_height
+
+func _physics_process(delta):
+    if target_player and not is_collected:
+        # 자석처럼 플레이어에게 끌려감
+        var dir = (target_player.global_position - global_position)
+        var dist = dir.length()
+
+        if dist &lt; collect_range:
+            collect()
+        else:
+            global_position += dir.normalized() * magnet_speed * delta
+
+func collect():
+    is_collected = true
+    if target_player.has_method("add_score"):
+        target_player.add_score(point_value)
+    # 수집 연출
+    var tween = create_tween()
+    tween.tween_property(self, "scale", Vector3.ZERO, 0.2)
+    tween.tween_callback(queue_free)</code></pre>
+        <pre class="fragment"><code class="language-gdscript"># player_3d.gd (수집 관련 부분)
+extends CharacterBody3D
+
+var score := 0
+
+func _ready():
+    add_to_group("player")
+
+func add_score(points: int):
+    score += points
+    print("점수: %d (+%d)" % [score, points])</code></pre>
+      </section>
+
+      <!-- Slide 18: Chapter 14 정리 -->
+      <section data-narration="챕터 14에서 3D 물리와 충돌의 핵심을 학습했습니다. GodotPhysics3D와 Jolt 엔진, StaticBody3D로 고정 환경, RigidBody3D로 물리 시뮬레이션, CharacterBody3D로 캐릭터 이동을 배웠습니다. 다양한 3D 충돌 형태와 레이어 마스크 시스템, RayCast3D와 ShapeCast3D, 물리 머티리얼과 조인트까지 다뤘습니다. 다음 챕터에서는 이 모든 것을 활용한 3D 캐릭터 컨트롤러를 만들어봅니다.">
+        <h2>Chapter 14 정리</h2>
+        <div class="key-point">
+          <h3>핵심 요약</h3>
+          <ul>
+            <li><strong>StaticBody3D</strong>: 고정 환경 (바닥, 벽, 지형)</li>
+            <li><strong>RigidBody3D</strong>: 물리 시뮬레이션 (상자, 공, 파편)</li>
+            <li><strong>CharacterBody3D</strong>: 코드 제어 이동 (플레이어, NPC)</li>
+            <li><strong>Area3D</strong>: 영역 감지 트리거 (아이템, 데미지 존)</li>
+          </ul>
+        </div>
+        <table class="compare-table fragment" style="font-size: 0.75em;">
+          <tr><th>개념</th><th>핵심 내용</th></tr>
+          <tr><td>CollisionShape3D</td><td>Box, Sphere, Capsule, Cylinder, Convex, Concave</td></tr>
+          <tr><td>충돌 레이어/마스크</td><td>2D와 동일한 필터링 시스템 (3D Physics 별도 설정)</td></tr>
+          <tr><td>body_entered/exited</td><td>Area3D에서 물리 바디 진입/이탈 감지</td></tr>
+          <tr><td>RayCast3D</td><td>광선 기반 감지 (히트스캔, 시야, 바닥 감지)</td></tr>
+          <tr><td>ShapeCast3D</td><td>도형 기반 범위 감지 (폭발, 이동 검사)</td></tr>
+          <tr><td>PhysicsMaterial</td><td>friction(마찰), bounce(반발) 설정</td></tr>
+          <tr><td>Joint3D</td><td>Pin, Hinge, Slider, ConeTwist, Generic6DOF</td></tr>
+        </table>
+        <div class="tip fragment">
+          <strong>다음 단계:</strong> 물리 바디와 충돌 시스템을 이해했으니, 다음 챕터에서는 완성도 높은 3D 캐릭터 컨트롤러를 직접 만들어봅시다. 이동, 점프, 카메라 추적까지 구현합니다.
+        </div>
+      </section>
+
+      <!-- Slide 19 (end): Next Chapter -->
+      <section class="chapter-title" data-transition="zoom" data-narration="챕터 14 3D 물리와 충돌 학습을 완료하셨습니다. 3D 물리 바디, 충돌 형태, 레이캐스트, 물리 머티리얼, 조인트까지 3D 물리의 핵심을 모두 배웠습니다. 다음 챕터에서는 3D 캐릭터 컨트롤러를 만듭니다. CharacterBody3D 기반의 이동, 점프, 카메라 시스템을 완성하여 실제 게임에 사용할 수 있는 컨트롤러를 구현합니다.">
+        <span class="chapter-number">Next</span>
+        <h1>수고하셨습니다!</h1>
+        <br>
+        <p><a href="15-3d-character-controller.html" style="color: var(--gd-blue); font-size: 1.2em;">다음 챕터: 3D 캐릭터 컨트롤러 &#8594;</a></p>
+        <br>
+        <p><a href="../index.html" style="color: #888; font-size: 0.7em;">&#8592; 목차로 돌아가기</a></p>
+      </section>
+
+    </div>
+  </div>
+  <div class="nav-footer"><a href="../index.html" style="color: #888;">Godot 초보부터 고수까지</a> | Chapter 14</div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/plugin/highlight/highlight.min.js"></script>
+  <script>
+    Reveal.initialize({ hash: true, slideNumber: true, plugins: [RevealHighlight], transition: 'slide', height: 700, center: false, margin: 0.04, minScale: 0.2, maxScale: 1.5, keyboard: { 38: null, 40: null }, mouseWheel: false });
+    document.addEventListener('keydown', function(e) { if (e.keyCode === 38 || e.keyCode === 40) { var slide = Reveal.getCurrentSlide(); if (!slide) return; var amount = 80; if (e.keyCode === 38) { slide.scrollTop -= amount; } else { slide.scrollTop += amount; } e.preventDefault(); e.stopPropagation(); } }, true);
+  </script>
+  <script src="js/narration.js"></script>
+</body>
+</html>

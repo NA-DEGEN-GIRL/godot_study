@@ -1,0 +1,1233 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 17: 3D 메시와 머티리얼 - Godot 초보부터 고수까지</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/theme/night.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/plugin/highlight/monokai.min.css">
+  <link rel="stylesheet" href="css/custom.css">
+  <link rel="stylesheet" href="css/narration.css">
+</head>
+<body>
+  <div class="reveal">
+    <div class="slides">
+
+      <!-- Slide 1: Title -->
+      <section class="chapter-title" data-transition="zoom" data-narration="챕터 17에 오신 것을 환영합니다. 이번 챕터에서는 3D 게임의 시각적 품질을 결정짓는 핵심 요소인 메시와 머티리얼을 깊이 있게 다룹니다. 프리미티브 메시부터 PBR 머티리얼, 셰이더 프로그래밍, CSG 모델링, 그리고 MultiMesh를 활용한 대량 렌더링까지 폭넓게 학습합니다. 3D 오브젝트의 형태와 질감을 자유자재로 다루는 기술을 익혀봅시다.">
+        <span class="chapter-number">Chapter 17</span>
+        <h1>3D 메시와 머티리얼</h1>
+        <p class="subtitle">Mesh, StandardMaterial3D, 셰이더, CSG, MultiMesh</p>
+        <br>
+        <p><a href="../index.html" style="color: #888; font-size: 0.6em;">&#8592; 목차로 돌아가기</a></p>
+      </section>
+
+      <!-- Slide 2: 메시 개요 -->
+      <section data-narration="메시는 3D 오브젝트의 형태를 정의하는 데이터 구조입니다. 정점, 법선, UV 좌표, 인덱스 등의 배열로 구성되며 GPU가 이 데이터를 기반으로 화면에 삼각형을 그립니다. Godot에서 Mesh는 추상 기본 클래스이고, ArrayMesh는 코드로 직접 정점 데이터를 구성할 때, PrimitiveMesh는 박스나 구 같은 기본 도형을 빠르게 만들 때 사용합니다.">
+        <h2>메시(Mesh) 개요</h2>
+        <p>3D 오브젝트의 형태를 정의하는 데이터 구조</p>
+        <div class="key-point">
+          <h3>메시를 구성하는 핵심 데이터</h3>
+          <ul>
+            <li><strong>Vertices (정점)</strong> - 3D 공간의 점 좌표 (Vector3 배열)</li>
+            <li><strong>Normals (법선)</strong> - 각 정점의 방향 벡터 (조명 계산에 사용)</li>
+            <li><strong>UVs (텍스처 좌표)</strong> - 2D 텍스처를 3D 표면에 매핑하는 좌표</li>
+            <li><strong>Indices (인덱스)</strong> - 정점을 연결하여 삼각형을 구성하는 순서</li>
+          </ul>
+        </div>
+        <table class="compare-table">
+          <tr>
+            <th>클래스</th>
+            <th>용도</th>
+            <th>특징</th>
+          </tr>
+          <tr>
+            <td><code>Mesh</code></td>
+            <td>추상 기본 클래스</td>
+            <td>직접 사용하지 않음, 공통 인터페이스 제공</td>
+          </tr>
+          <tr>
+            <td><code>ArrayMesh</code></td>
+            <td>코드로 정점 데이터 직접 구성</td>
+            <td>절차적 메시 생성, 최대 유연성</td>
+          </tr>
+          <tr>
+            <td><code>PrimitiveMesh</code></td>
+            <td>박스, 구, 실린더 등 기본 도형</td>
+            <td>파라미터만 설정하면 자동 생성</td>
+          </tr>
+          <tr>
+            <td><code>ImmediateMesh</code></td>
+            <td>실시간 디버그 렌더링</td>
+            <td>매 프레임 다시 그리는 동적 메시</td>
+          </tr>
+        </table>
+        <div class="tip">
+          <strong>Tip:</strong> 대부분의 게임 에셋은 외부 3D 모델링 툴에서 만들어 임포트하지만, 프로토타이핑과 절차적 생성에는 코드 기반 메시가 매우 유용합니다.
+        </div>
+      </section>
+
+      <!-- Slide 3: 프리미티브 메시 종류 -->
+      <section data-narration="PrimitiveMesh를 상속하는 기본 도형 클래스들을 살펴봅시다. BoxMesh, SphereMesh, CylinderMesh, CapsuleMesh, PlaneMesh, PrismMesh, TorusMesh 등이 있으며, 각각 크기와 분할 수를 파라미터로 조절할 수 있습니다. 프로토타이핑 단계에서 빠르게 레벨을 구성하거나, 충돌 시각화, 디버그 표시 등에 매우 유용합니다.">
+        <h2>프리미티브 메시 종류</h2>
+        <p><span class="badge badge-blue">PrimitiveMesh</span> 파라미터만으로 빠르게 기본 도형 생성</p>
+        <div class="two-columns">
+          <div>
+            <table class="compare-table">
+              <tr>
+                <th>클래스</th>
+                <th>형태</th>
+                <th>주요 파라미터</th>
+              </tr>
+              <tr>
+                <td><code>BoxMesh</code></td>
+                <td>직육면체</td>
+                <td>size (Vector3)</td>
+              </tr>
+              <tr>
+                <td><code>SphereMesh</code></td>
+                <td>구</td>
+                <td>radius, height, rings, segments</td>
+              </tr>
+              <tr>
+                <td><code>CylinderMesh</code></td>
+                <td>원기둥</td>
+                <td>top/bottom_radius, height</td>
+              </tr>
+              <tr>
+                <td><code>CapsuleMesh</code></td>
+                <td>캡슐</td>
+                <td>radius, height</td>
+              </tr>
+              <tr>
+                <td><code>PlaneMesh</code></td>
+                <td>평면</td>
+                <td>size (Vector2)</td>
+              </tr>
+              <tr>
+                <td><code>TorusMesh</code></td>
+                <td>토러스(도넛)</td>
+                <td>inner/outer_radius</td>
+              </tr>
+              <tr>
+                <td><code>TextMesh</code></td>
+                <td>3D 텍스트</td>
+                <td>text, font, depth</td>
+              </tr>
+            </table>
+          </div>
+          <div>
+            <h3>GDScript로 프리미티브 생성</h3>
+            <pre><code class="language-gdscript"># 코드로 프리미티브 메시 생성
+func create_primitives():
+    # 박스 메시
+    var box = BoxMesh.new()
+    box.size = Vector3(2, 1, 3)
+
+    # 구 메시 (세밀도 조절)
+    var sphere = SphereMesh.new()
+    sphere.radius = 1.5
+    sphere.height = 3.0
+    sphere.radial_segments = 32
+    sphere.rings = 16
+
+    # 실린더 (원뿔도 가능)
+    var cone = CylinderMesh.new()
+    cone.top_radius = 0.0   # 꼭대기를 0으로
+    cone.bottom_radius = 1.0
+    cone.height = 2.0
+
+    # MeshInstance3D에 할당
+    var mesh_inst = MeshInstance3D.new()
+    mesh_inst.mesh = box
+    add_child(mesh_inst)</code></pre>
+          </div>
+        </div>
+        <div class="tip">
+          <strong>Tip:</strong> <code>radial_segments</code>와 <code>rings</code>를 높이면 더 부드러운 곡면이 만들어지지만 정점 수가 증가하여 성능에 영향을 줍니다. 프로토타입에는 낮은 값, 최종 에셋에는 적절한 값을 사용하세요.
+        </div>
+      </section>
+
+      <!-- Slide 4: MeshInstance3D 속성 -->
+      <section data-narration="MeshInstance3D는 메시를 씬 트리에 배치하여 화면에 렌더링하는 노드입니다. mesh 속성에 Mesh 리소스를 할당하고, material_override로 전체 머티리얼을 덮어쓸 수 있습니다. 그림자 캐스팅, LOD, 가시성 범위 등 렌더링 관련 세부 설정도 제공합니다. GI 모드 설정으로 글로벌 일루미네이션에 기여하는 방식도 제어할 수 있습니다.">
+        <h2>MeshInstance3D 속성</h2>
+        <p>메시를 씬에 배치하고 렌더링하는 핵심 노드</p>
+        <div class="two-columns">
+          <div>
+            <div class="key-point">
+              <h3>주요 속성</h3>
+              <ul>
+                <li><strong>mesh</strong> - 표시할 Mesh 리소스</li>
+                <li><strong>material_override</strong> - 전체 표면 머티리얼 덮어쓰기</li>
+                <li><strong>cast_shadow</strong> - 그림자 캐스팅 모드</li>
+                <li><strong>gi_mode</strong> - GI(Global Illumination) 참여 방식</li>
+                <li><strong>visibility_range_begin/end</strong> - LOD 거리 설정</li>
+                <li><strong>transparency</strong> - 투명도 렌더링 순서</li>
+              </ul>
+            </div>
+            <div class="warning">
+              <strong>주의:</strong> <code>cast_shadow</code>를 Off로 설정하면 성능이 향상되지만 시각적 사실감이 떨어집니다. 작은 오브젝트나 카메라에서 먼 오브젝트에 적용하세요.
+            </div>
+          </div>
+          <div>
+            <pre><code class="language-gdscript"># MeshInstance3D 설정 예제
+func setup_mesh_instance():
+    var mesh_inst = MeshInstance3D.new()
+    mesh_inst.mesh = preload("res://assets/models/tree.tres")
+
+    # 그림자 설정
+    mesh_inst.cast_shadow = (
+        GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+    )
+
+    # LOD: 거리별 가시성
+    mesh_inst.visibility_range_begin = 0.0
+    mesh_inst.visibility_range_end = 50.0
+    mesh_inst.visibility_range_fade_mode = (
+        GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
+    )
+
+    # 표면별 머티리얼 접근
+    var mat = mesh_inst.get_surface_override_material(0)
+    if mat == null:
+        mat = StandardMaterial3D.new()
+        mesh_inst.set_surface_override_material(0, mat)
+
+    # 머티리얼 덮어쓰기 (모든 표면)
+    var override_mat = StandardMaterial3D.new()
+    override_mat.albedo_color = Color.RED
+    mesh_inst.material_override = override_mat
+
+    add_child(mesh_inst)</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 5: StandardMaterial3D 개요 -->
+      <section data-narration="StandardMaterial3D는 Godot의 PBR 기반 기본 머티리얼입니다. 물리 기반 렌더링을 통해 현실적인 재질 표현이 가능하며, Albedo, Metallic, Roughness, Normal Map, Emission 등 다양한 속성을 조합하여 나무, 금속, 유리, 피부 등 거의 모든 재질을 표현할 수 있습니다. 인스펙터에서 시각적으로 편집하거나 코드로 동적 생성할 수 있습니다.">
+        <h2>StandardMaterial3D 개요</h2>
+        <p><span class="badge badge-green">PBR</span> 물리 기반 렌더링 머티리얼</p>
+        <div class="key-point">
+          <h3>StandardMaterial3D 핵심 채널</h3>
+          <table class="compare-table">
+            <tr>
+              <th>채널</th>
+              <th>역할</th>
+              <th>주요 속성</th>
+            </tr>
+            <tr>
+              <td>Albedo</td>
+              <td>기본 색상 / 텍스처</td>
+              <td>albedo_color, albedo_texture</td>
+            </tr>
+            <tr>
+              <td>Metallic</td>
+              <td>금속성 (0=비금속, 1=금속)</td>
+              <td>metallic, metallic_texture</td>
+            </tr>
+            <tr>
+              <td>Roughness</td>
+              <td>거칠기 (0=매끄러움, 1=거침)</td>
+              <td>roughness, roughness_texture</td>
+            </tr>
+            <tr>
+              <td>Normal Map</td>
+              <td>표면 울퉁불퉁함 시뮬레이션</td>
+              <td>normal_enabled, normal_texture</td>
+            </tr>
+            <tr>
+              <td>Emission</td>
+              <td>자체 발광</td>
+              <td>emission, emission_texture</td>
+            </tr>
+            <tr>
+              <td>Transparency</td>
+              <td>투명도</td>
+              <td>transparency, alpha_scissor_threshold</td>
+            </tr>
+          </table>
+        </div>
+        <pre><code class="language-gdscript"># StandardMaterial3D 기본 생성
+func create_material() -&gt; StandardMaterial3D:
+    var mat = StandardMaterial3D.new()
+    mat.albedo_color = Color(0.8, 0.2, 0.1)  # 붉은 색
+    mat.metallic = 0.0
+    mat.roughness = 0.7
+    return mat</code></pre>
+      </section>
+
+      <!-- Slide 6: Albedo (텍스처/색상) -->
+      <section data-narration="Albedo는 머티리얼의 기본 색상을 결정합니다. 단색 색상만 지정하거나, 텍스처 이미지를 매핑하거나, 색상과 텍스처를 곱하여 색조를 조절할 수 있습니다. 텍스처 필터링 모드와 반복 설정도 중요합니다. 픽셀 아트 스타일이라면 필터를 꺼서 선명하게, 사실적 스타일이라면 필터를 켜서 부드럽게 표현합니다.">
+        <h2>Albedo (기본 색상/텍스처)</h2>
+        <p>오브젝트의 기본 색상과 텍스처를 결정하는 채널</p>
+        <div class="two-columns">
+          <div>
+            <h3 style="color: var(--gd-green);">색상 설정</h3>
+            <pre><code class="language-gdscript"># 단색 설정
+var mat = StandardMaterial3D.new()
+mat.albedo_color = Color(0.2, 0.6, 0.9)
+
+# 텍스처 설정
+mat.albedo_texture = preload(
+    "res://assets/textures/brick_albedo.png"
+)
+
+# 색상 + 텍스처 (곱연산)
+# 텍스처 위에 색조를 입힘
+mat.albedo_color = Color(1.0, 0.8, 0.8)
+mat.albedo_texture = preload(
+    "res://assets/textures/stone.png"
+)
+
+# UV 스케일 조절 (텍스처 반복)
+mat.uv1_scale = Vector3(4, 4, 1)
+mat.uv1_offset = Vector3(0, 0, 0)</code></pre>
+          </div>
+          <div>
+            <h3 style="color: var(--gd-blue);">텍스처 필터링</h3>
+            <pre><code class="language-gdscript"># 텍스처 필터링 모드
+mat.texture_filter = (
+    BaseMaterial3D.TEXTURE_FILTER_LINEAR
+)
+# LINEAR - 부드러운 보간 (사실적)
+# NEAREST - 픽셀 그대로 (픽셀아트)
+# LINEAR_WITH_MIPMAPS - 원거리 최적화
+
+# 텍스처 반복 모드
+mat.texture_repeat = true</code></pre>
+            <div class="key-point">
+              <h3>Albedo 색상 팁</h3>
+              <ul>
+                <li>PBR에서 Albedo는 순수한 표면 색상</li>
+                <li>조명 정보를 Albedo에 굽지 마세요</li>
+                <li>너무 어둡거나(0.04 이하) 밝은(0.9 이상) 값은 비현실적</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 7: Metallic/Roughness (PBR) -->
+      <section data-narration="Metallic과 Roughness는 PBR 워크플로우의 핵심 파라미터입니다. Metallic이 높으면 반사가 Albedo 색상을 따르고, 낮으면 회색빛 반사가 됩니다. Roughness가 낮으면 거울처럼 선명한 반사, 높으면 확산된 반사가 나타납니다. 이 두 값을 조합하면 플라스틱, 나무, 금속, 유리 등 다양한 재질을 표현할 수 있습니다.">
+        <h2>Metallic / Roughness (PBR)</h2>
+        <p><span class="badge badge-blue">PBR 핵심</span> 물리 기반 재질 표현의 두 축</p>
+        <div class="two-columns">
+          <div>
+            <h3>재질별 설정 가이드</h3>
+            <table class="compare-table">
+              <tr>
+                <th>재질</th>
+                <th>Metallic</th>
+                <th>Roughness</th>
+              </tr>
+              <tr>
+                <td>광택 금속</td>
+                <td>1.0</td>
+                <td>0.1 ~ 0.3</td>
+              </tr>
+              <tr>
+                <td>녹슨 금속</td>
+                <td>0.7 ~ 1.0</td>
+                <td>0.6 ~ 0.9</td>
+              </tr>
+              <tr>
+                <td>플라스틱</td>
+                <td>0.0</td>
+                <td>0.3 ~ 0.5</td>
+              </tr>
+              <tr>
+                <td>나무</td>
+                <td>0.0</td>
+                <td>0.5 ~ 0.8</td>
+              </tr>
+              <tr>
+                <td>돌/콘크리트</td>
+                <td>0.0</td>
+                <td>0.7 ~ 1.0</td>
+              </tr>
+              <tr>
+                <td>유리</td>
+                <td>0.0</td>
+                <td>0.0 ~ 0.1</td>
+              </tr>
+              <tr>
+                <td>피부</td>
+                <td>0.0</td>
+                <td>0.4 ~ 0.6</td>
+              </tr>
+            </table>
+          </div>
+          <div>
+            <pre><code class="language-gdscript"># 다양한 PBR 재질 생성
+func create_gold() -&gt; StandardMaterial3D:
+    var mat = StandardMaterial3D.new()
+    mat.albedo_color = Color(1.0, 0.85, 0.3)
+    mat.metallic = 1.0
+    mat.roughness = 0.2
+    return mat
+
+func create_rubber() -&gt; StandardMaterial3D:
+    var mat = StandardMaterial3D.new()
+    mat.albedo_color = Color(0.1, 0.1, 0.1)
+    mat.metallic = 0.0
+    mat.roughness = 0.9
+    return mat
+
+func create_glass() -&gt; StandardMaterial3D:
+    var mat = StandardMaterial3D.new()
+    mat.albedo_color = Color(0.9, 0.95, 1.0, 0.3)
+    mat.metallic = 0.0
+    mat.roughness = 0.0
+    mat.transparency = (
+        BaseMaterial3D.TRANSPARENCY_ALPHA
+    )
+    return mat
+
+# 텍스처 기반 PBR
+func create_pbr_textured() -&gt; StandardMaterial3D:
+    var mat = StandardMaterial3D.new()
+    mat.albedo_texture = preload(
+        "res://textures/metal_albedo.png"
+    )
+    mat.metallic = 1.0
+    mat.metallic_texture = preload(
+        "res://textures/metal_metallic.png"
+    )
+    mat.roughness_texture = preload(
+        "res://textures/metal_roughness.png"
+    )
+    return mat</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 8: Normal Map -->
+      <section data-narration="Normal Map은 실제로 정점을 추가하지 않고도 표면의 울퉁불퉁한 디테일을 시뮬레이션하는 기법입니다. RGB 값이 각 픽셀의 법선 방향을 인코딩하여 조명 계산 시 실제 요철이 있는 것처럼 보이게 합니다. 폴리곤 수를 늘리지 않고도 벽돌, 직물, 피부 등의 세밀한 질감을 표현할 수 있어 성능과 품질의 균형을 맞추는 핵심 기술입니다.">
+        <h2>Normal Map</h2>
+        <p><span class="badge badge-green">디테일</span> 폴리곤 없이 표면 울퉁불퉁함 시뮬레이션</p>
+        <div class="two-columns">
+          <div>
+            <div class="key-point">
+              <h3>Normal Map 원리</h3>
+              <ul>
+                <li>RGB 값이 법선 방향을 인코딩</li>
+                <li>R = X축, G = Y축, B = Z축 방향</li>
+                <li>조명 계산 시 실제 요철처럼 반응</li>
+                <li>실루엣은 변하지 않음 (한계)</li>
+              </ul>
+            </div>
+            <div class="tip">
+              <strong>Tip:</strong> Normal Map의 강도(normal_scale)를 조절하여 효과의 세기를 제어하세요. 1.0이 기본이고, 2.0 이상이면 매우 거친 표면이 됩니다.
+            </div>
+            <div class="warning">
+              <strong>주의:</strong> Normal Map은 OpenGL 형식과 DirectX 형식이 있습니다. Godot은 OpenGL 형식을 사용합니다. DirectX 형식이면 Green 채널을 반전해야 합니다.
+            </div>
+          </div>
+          <div>
+            <pre><code class="language-gdscript"># Normal Map 적용
+func apply_normal_map():
+    var mat = StandardMaterial3D.new()
+    mat.albedo_texture = preload(
+        "res://textures/brick_albedo.png"
+    )
+
+    # Normal Map 활성화 및 텍스처 설정
+    mat.normal_enabled = true
+    mat.normal_texture = preload(
+        "res://textures/brick_normal.png"
+    )
+    mat.normal_scale = 1.5  # 강도 조절
+
+    return mat
+
+# Depth Map (Parallax) - 깊이감 추가
+func apply_depth_map():
+    var mat = StandardMaterial3D.new()
+    mat.normal_enabled = true
+    mat.normal_texture = preload(
+        "res://textures/stone_normal.png"
+    )
+
+    # 높이맵으로 시차 효과
+    mat.heightmap_enabled = true
+    mat.heightmap_texture = preload(
+        "res://textures/stone_height.png"
+    )
+    mat.heightmap_scale = 0.05
+    mat.heightmap_deep_parallax = true
+
+    return mat</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 9: Emission -->
+      <section data-narration="Emission은 머티리얼이 자체적으로 빛을 방출하는 효과입니다. 네온사인, 용암, LED 패널, 마법 이펙트 등을 표현할 때 사용합니다. emission_energy 값을 높이면 블룸 효과와 결합하여 눈부신 발광 효과를 만들 수 있습니다. Emission 텍스처를 사용하면 특정 영역만 발광하게 할 수도 있습니다. VoxelGI나 SDFGI와 결합하면 주변을 실제로 비추는 효과도 가능합니다.">
+        <h2>Emission (자체 발광)</h2>
+        <p><span class="badge badge-orange">발광</span> 오브젝트가 스스로 빛을 내는 효과</p>
+        <div class="two-columns">
+          <div>
+            <pre><code class="language-gdscript"># 기본 Emission
+func create_glowing_material():
+    var mat = StandardMaterial3D.new()
+    mat.albedo_color = Color(0.1, 0.1, 0.1)
+
+    # Emission 활성화
+    mat.emission_enabled = true
+    mat.emission = Color(0.0, 0.8, 1.0)
+    mat.emission_energy_multiplier = 3.0
+
+    return mat
+
+# Emission 텍스처 (부분 발광)
+func create_panel_material():
+    var mat = StandardMaterial3D.new()
+    mat.albedo_texture = preload(
+        "res://textures/panel_albedo.png"
+    )
+    mat.emission_enabled = true
+    mat.emission_texture = preload(
+        "res://textures/panel_emission.png"
+    )
+    mat.emission_energy_multiplier = 2.0
+    return mat</code></pre>
+          </div>
+          <div>
+            <pre><code class="language-gdscript"># Emission 애니메이션 (깜빡이는 네온)
+var _time: float = 0.0
+
+func _process(delta: float):
+    _time += delta
+    var mat: StandardMaterial3D = (
+        $MeshInstance3D.get_surface_override_material(0)
+    )
+    # 사인파로 발광 강도 애니메이션
+    var pulse = (sin(_time * 3.0) + 1.0) / 2.0
+    mat.emission_energy_multiplier = (
+        lerpf(0.5, 4.0, pulse)
+    )
+
+# 블룸 효과와 결합 (Environment 설정)
+# WorldEnvironment 노드의 Environment:
+# - Glow: enabled = true
+# - Glow: intensity = 0.8
+# - Glow: bloom = 0.2
+# 이렇게 설정하면 Emission이
+# 자연스러운 빛번짐 효과를 만듭니다</code></pre>
+            <div class="tip">
+              <strong>Tip:</strong> <code>emission_energy_multiplier</code>를 1.0 이상으로 설정하면 블룸(Glow) 효과에 반응하여 눈부신 발광을 표현합니다.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 10: Transparency/Alpha -->
+      <section data-narration="투명도는 유리, 물, 홀로그램, 페이드 효과 등에 사용됩니다. Godot은 여러 투명도 모드를 제공합니다. ALPHA 모드는 부드러운 반투명을, ALPHA_SCISSOR는 이진 투명(완전 투명 또는 완전 불투명)을 제공합니다. 알파 블렌딩은 렌더링 순서 문제가 발생할 수 있으므로, 가능하면 Alpha Scissor나 Alpha Hash를 사용하는 것이 좋습니다.">
+        <h2>Transparency / Alpha</h2>
+        <p>투명도 처리 모드와 주의사항</p>
+        <div class="two-columns">
+          <div>
+            <table class="compare-table">
+              <tr>
+                <th>모드</th>
+                <th>특징</th>
+                <th>용도</th>
+              </tr>
+              <tr>
+                <td>DISABLED</td>
+                <td>투명도 없음 (기본)</td>
+                <td>불투명 오브젝트</td>
+              </tr>
+              <tr>
+                <td>ALPHA</td>
+                <td>부드러운 반투명</td>
+                <td>유리, 물, 연기</td>
+              </tr>
+              <tr>
+                <td>ALPHA_SCISSOR</td>
+                <td>임계값 기반 이진 투명</td>
+                <td>나뭇잎, 풀, 철조망</td>
+              </tr>
+              <tr>
+                <td>ALPHA_HASH</td>
+                <td>디더링 기반 근사 투명</td>
+                <td>페이드 효과, 정렬 문제 회피</td>
+              </tr>
+              <tr>
+                <td>DEPTH_PRE_PASS</td>
+                <td>깊이 선행 처리</td>
+                <td>복잡한 반투명 + 깊이</td>
+              </tr>
+            </table>
+          </div>
+          <div>
+            <pre><code class="language-gdscript"># 반투명 유리
+func create_glass():
+    var mat = StandardMaterial3D.new()
+    mat.transparency = (
+        BaseMaterial3D.TRANSPARENCY_ALPHA
+    )
+    mat.albedo_color = Color(0.8, 0.9, 1.0, 0.3)
+    mat.metallic = 0.1
+    mat.roughness = 0.0
+    # 뒷면도 렌더링 (양면)
+    mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+    return mat
+
+# Alpha Scissor (나뭇잎 등)
+func create_foliage():
+    var mat = StandardMaterial3D.new()
+    mat.transparency = (
+        BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
+    )
+    mat.alpha_scissor_threshold = 0.5
+    mat.albedo_texture = preload(
+        "res://textures/leaf.png"
+    )
+    # 양면 렌더링
+    mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+    return mat</code></pre>
+          </div>
+        </div>
+        <div class="warning">
+          <strong>주의:</strong> ALPHA 모드는 렌더링 순서 문제(Z-fighting, 겹침 오류)가 발생할 수 있습니다. 가능하면 <code>ALPHA_SCISSOR</code>나 <code>ALPHA_HASH</code>를 우선 사용하세요. 불투명 오브젝트가 항상 성능에 유리합니다.
+        </div>
+      </section>
+
+      <!-- Slide 11: ShaderMaterial 소개 -->
+      <section data-narration="StandardMaterial3D로 표현할 수 없는 효과가 필요하다면 ShaderMaterial을 사용합니다. Godot의 셰이딩 언어로 직접 vertex 및 fragment 셰이더를 작성하여 완전한 커스텀 렌더링이 가능합니다. 물 표면 효과, 디졸브 효과, 홀로그램, 외곽선 등 무한한 시각 효과를 만들 수 있습니다. GLSL과 유사하지만 Godot에 최적화된 문법을 제공합니다.">
+        <h2>ShaderMaterial 소개</h2>
+        <p><span class="badge badge-red">고급</span> 커스텀 셰이더로 무한한 시각 효과</p>
+        <div class="two-columns">
+          <div>
+            <div class="key-point">
+              <h3>StandardMaterial3D vs ShaderMaterial</h3>
+              <ul>
+                <li><strong>StandardMaterial3D</strong> - 인스펙터에서 설정, PBR 기반, 간편</li>
+                <li><strong>ShaderMaterial</strong> - 코드로 작성, 완전 자유, 고급</li>
+              </ul>
+            </div>
+            <pre><code class="language-gdscript"># ShaderMaterial 생성 (GDScript)
+func create_shader_material():
+    var shader_mat = ShaderMaterial.new()
+    var shader = Shader.new()
+    shader.code = """
+    shader_type spatial;
+
+    uniform vec4 color : source_color = vec4(1.0);
+    uniform float speed = 2.0;
+
+    void fragment() {
+        ALBEDO = color.rgb;
+        EMISSION = color.rgb * 0.5;
+    }
+    """
+    shader_mat.shader = shader
+    shader_mat.set_shader_parameter("color",
+        Color(0.0, 1.0, 0.5))
+    return shader_mat</code></pre>
+          </div>
+          <div>
+            <h3>.gdshader 파일 방식 (권장)</h3>
+            <pre><code class="language-gdscript"># res://shaders/custom.gdshader
+# shader_type spatial;
+# render_mode blend_mix, cull_back;
+#
+# uniform vec4 albedo_color : source_color;
+# uniform sampler2D albedo_tex;
+# uniform float rim_power = 3.0;
+#
+# void fragment() {
+#     vec4 tex = texture(albedo_tex, UV);
+#     ALBEDO = tex.rgb * albedo_color.rgb;
+#     float rim = 1.0 - dot(NORMAL, VIEW);
+#     EMISSION = vec3(pow(rim, rim_power));
+# }
+
+# GDScript에서 .gdshader 파일 사용
+func apply_shader():
+    var mat = ShaderMaterial.new()
+    mat.shader = preload(
+        "res://shaders/custom.gdshader"
+    )
+    mat.set_shader_parameter(
+        "albedo_color", Color.CYAN
+    )
+    mat.set_shader_parameter(
+        "rim_power", 4.0
+    )
+    $MeshInstance3D.material_override = mat</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 12: 셰이더 언어 기초 (vertex/fragment) -->
+      <section data-narration="Godot 셰이더는 크게 vertex 함수와 fragment 함수로 구성됩니다. vertex 함수는 각 정점의 위치를 변형하고, fragment 함수는 각 픽셀의 색상을 결정합니다. spatial 타입 셰이더에서 VERTEX로 정점 위치를, ALBEDO와 EMISSION으로 색상을, ROUGHNESS와 METALLIC으로 재질감을 제어합니다. uniform 변수로 인스펙터에서 값을 조절할 수 있습니다.">
+        <h2>셰이더 언어 기초</h2>
+        <p><span class="badge badge-blue">vertex</span> <span class="badge badge-green">fragment</span> 두 단계의 렌더링 파이프라인</p>
+        <div class="key-point">
+          <h3>셰이더 파이프라인 흐름</h3>
+          <ul>
+            <li><strong>vertex()</strong> - 정점 위치 변형 (모델 변형, 애니메이션)</li>
+            <li><strong>fragment()</strong> - 픽셀 색상 결정 (텍스처, 조명, 효과)</li>
+            <li><strong>light()</strong> - 커스텀 조명 모델 (선택 사항)</li>
+          </ul>
+        </div>
+        <pre><code class="language-gdscript"># 셰이더 기본 구조 (.gdshader 파일)
+# shader_type spatial;
+# render_mode blend_mix, depth_draw_opaque, cull_back;
+#
+# // uniform: 외부에서 값 전달 (인스펙터에 노출)
+# uniform vec4 base_color : source_color = vec4(1.0, 1.0, 1.0, 1.0);
+# uniform float wave_speed = 2.0;
+# uniform float wave_height = 0.3;
+# uniform sampler2D noise_tex;
+#
+# // vertex 함수: 정점 위치 변형
+# void vertex() {
+#     // TIME 내장 변수로 시간 기반 애니메이션
+#     float wave = sin(VERTEX.x * 3.0 + TIME * wave_speed) * wave_height;
+#     VERTEX.y += wave;
+#     // 법선 재계산 (조명이 올바르게 적용되도록)
+#     NORMAL = normalize(vec3(-cos(VERTEX.x * 3.0 + TIME * wave_speed) * wave_height * 3.0, 1.0, 0.0));
+# }
+#
+# // fragment 함수: 픽셀 색상 결정
+# void fragment() {
+#     ALBEDO = base_color.rgb;
+#     ROUGHNESS = 0.3;
+#     METALLIC = 0.0;
+#     // UV 좌표로 텍스처 샘플링
+#     vec4 noise = texture(noise_tex, UV + TIME * 0.1);
+#     ALBEDO *= noise.rgb;
+# }</code></pre>
+        <table class="compare-table">
+          <tr>
+            <th>내장 변수</th>
+            <th>함수</th>
+            <th>설명</th>
+          </tr>
+          <tr>
+            <td><code>VERTEX</code></td>
+            <td>vertex</td>
+            <td>정점 위치 (로컬 공간)</td>
+          </tr>
+          <tr>
+            <td><code>NORMAL</code></td>
+            <td>vertex/fragment</td>
+            <td>법선 벡터</td>
+          </tr>
+          <tr>
+            <td><code>UV</code></td>
+            <td>vertex/fragment</td>
+            <td>텍스처 좌표</td>
+          </tr>
+          <tr>
+            <td><code>ALBEDO</code></td>
+            <td>fragment</td>
+            <td>기본 색상 출력</td>
+          </tr>
+          <tr>
+            <td><code>EMISSION</code></td>
+            <td>fragment</td>
+            <td>발광 색상 출력</td>
+          </tr>
+          <tr>
+            <td><code>TIME</code></td>
+            <td>모두</td>
+            <td>경과 시간 (초)</td>
+          </tr>
+        </table>
+      </section>
+
+      <!-- Slide 13: 간단한 셰이더 예제 -->
+      <section data-narration="실용적인 셰이더 예제 세 가지를 살펴봅시다. 디졸브 효과는 노이즈 텍스처와 임계값을 비교하여 오브젝트가 사라지는 연출을 만듭니다. 림 라이팅은 오브젝트 외곽에 빛나는 테두리를 추가합니다. 홀로그램 효과는 스캔라인과 반투명을 조합합니다. 이 세 가지 패턴만 이해하면 다양한 응용이 가능합니다.">
+        <h2>간단한 셰이더 예제</h2>
+        <div class="two-columns">
+          <div>
+            <h3 style="color: var(--gd-orange);">디졸브 효과</h3>
+            <pre><code class="language-gdscript"># dissolve.gdshader
+# shader_type spatial;
+# render_mode cull_disabled;
+#
+# uniform sampler2D noise_tex;
+# uniform float dissolve_amount : hint_range(0.0, 1.0) = 0.0;
+# uniform vec4 edge_color : source_color = vec4(1.0, 0.3, 0.0, 1.0);
+# uniform float edge_width = 0.05;
+#
+# void fragment() {
+#     float noise = texture(noise_tex, UV).r;
+#     // 임계값 이하면 투명 처리
+#     if (noise &lt; dissolve_amount) {
+#         discard;
+#     }
+#     // 경계 부근에 발광 색상
+#     float edge = smoothstep(dissolve_amount,
+#         dissolve_amount + edge_width, noise);
+#     ALBEDO = mix(edge_color.rgb,
+#         vec3(0.5), edge);
+#     EMISSION = (1.0 - edge) * edge_color.rgb * 3.0;
+# }</code></pre>
+            <pre><code class="language-gdscript"># GDScript에서 디졸브 제어
+@onready var mat: ShaderMaterial = (
+    $Mesh.material_override
+)
+
+func dissolve(duration: float):
+    var tween = create_tween()
+    tween.tween_method(
+        set_dissolve, 0.0, 1.0, duration
+    )
+
+func set_dissolve(value: float):
+    mat.set_shader_parameter(
+        "dissolve_amount", value
+    )</code></pre>
+          </div>
+          <div>
+            <h3 style="color: var(--gd-green);">림 라이팅 (외곽 발광)</h3>
+            <pre><code class="language-gdscript"># rim_light.gdshader
+# shader_type spatial;
+#
+# uniform vec4 rim_color : source_color = vec4(0.0, 0.8, 1.0, 1.0);
+# uniform float rim_power = 3.0;
+# uniform vec4 albedo_color : source_color = vec4(0.2, 0.2, 0.2, 1.0);
+#
+# void fragment() {
+#     ALBEDO = albedo_color.rgb;
+#     // VIEW와 NORMAL의 내적으로 외곽 감지
+#     float rim = 1.0 - dot(NORMAL, VIEW);
+#     rim = pow(rim, rim_power);
+#     EMISSION = rim_color.rgb * rim * 2.0;
+# }</code></pre>
+            <h3 style="color: var(--gd-blue);">홀로그램 효과</h3>
+            <pre><code class="language-gdscript"># hologram.gdshader
+# shader_type spatial;
+# render_mode blend_add, cull_disabled;
+#
+# uniform vec4 holo_color : source_color = vec4(0.0, 1.0, 0.8, 1.0);
+# uniform float scan_speed = 3.0;
+# uniform float scan_lines = 80.0;
+#
+# void fragment() {
+#     float scan = sin(UV.y * scan_lines +
+#         TIME * scan_speed) * 0.5 + 0.5;
+#     float rim = 1.0 - dot(NORMAL, VIEW);
+#     ALBEDO = holo_color.rgb;
+#     ALPHA = (rim * 0.6 + scan * 0.3) * 0.8;
+#     EMISSION = holo_color.rgb * 1.5;
+# }</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 14: CSG (Constructive Solid Geometry) -->
+      <section data-narration="CSG는 기본 도형들을 불리언 연산으로 결합하여 복잡한 형태를 만드는 모델링 기법입니다. 에디터에서 실시간으로 결과를 확인할 수 있어 레벨 프로토타이핑에 매우 유용합니다. CSGBox3D, CSGSphere3D, CSGCylinder3D 등의 기본 도형과 CSGPolygon3D, CSGMesh3D로 더 복잡한 형태도 만들 수 있습니다. 단 CSG는 런타임 성능이 좋지 않으므로 프로토타이핑 후 정적 메시로 변환하는 것이 좋습니다.">
+        <h2>CSG (Constructive Solid Geometry)</h2>
+        <p><span class="badge badge-blue">프로토타이핑</span> 기본 도형의 불리언 연산으로 복잡한 형태 생성</p>
+        <div class="two-columns">
+          <div>
+            <div class="key-point">
+              <h3>CSG 노드 종류</h3>
+              <ul>
+                <li><strong>CSGBox3D</strong> - 직육면체</li>
+                <li><strong>CSGSphere3D</strong> - 구</li>
+                <li><strong>CSGCylinder3D</strong> - 원기둥 / 원뿔</li>
+                <li><strong>CSGTorus3D</strong> - 토러스</li>
+                <li><strong>CSGPolygon3D</strong> - 2D 폴리곤을 돌출/회전</li>
+                <li><strong>CSGMesh3D</strong> - 임의 메시를 CSG로 사용</li>
+                <li><strong>CSGCombiner3D</strong> - 여러 CSG를 그룹화</li>
+              </ul>
+            </div>
+            <div class="warning">
+              <strong>주의:</strong> CSG는 프로토타이핑 도구입니다. 최종 게임에서는 Mesh &gt; Bake Mesh 로 정적 메시로 변환하여 성능을 확보하세요.
+            </div>
+          </div>
+          <div>
+            <pre><code class="language-gdscript"># CSG 씬 트리 구성 예시
+# CSGCombiner3D (루트)
+# ├ CSGBox3D (벽)
+# │   operation = UNION
+# ├ CSGBox3D (문 구멍)
+# │   operation = SUBTRACTION
+# └ CSGCylinder3D (창문 구멍)
+#     operation = SUBTRACTION
+
+# 코드로 CSG 생성
+func create_room():
+    var combiner = CSGCombiner3D.new()
+    add_child(combiner)
+
+    # 외벽 (큰 박스)
+    var outer = CSGBox3D.new()
+    outer.size = Vector3(10, 4, 10)
+    outer.operation = CSGShape3D.OPERATION_UNION
+    combiner.add_child(outer)
+
+    # 내부 공간 (빼기)
+    var inner = CSGBox3D.new()
+    inner.size = Vector3(9, 3.5, 9)
+    inner.position.y = 0.25
+    inner.operation = (
+        CSGShape3D.OPERATION_SUBTRACTION
+    )
+    combiner.add_child(inner)
+
+    # 문 (빼기)
+    var door = CSGBox3D.new()
+    door.size = Vector3(1.2, 2.5, 1)
+    door.position = Vector3(0, -0.75, 5)
+    door.operation = (
+        CSGShape3D.OPERATION_SUBTRACTION
+    )
+    combiner.add_child(door)</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 15: CSG 연산 (Union/Intersection/Subtraction) -->
+      <section data-narration="CSG의 세 가지 불리언 연산을 자세히 살펴봅시다. Union은 두 도형을 합치고, Subtraction은 자식 도형 영역을 부모에서 제거하며, Intersection은 두 도형이 겹치는 영역만 남깁니다. 각 CSG 자식 노드의 operation 속성을 설정하여 연산 방식을 결정합니다. 머티리얼은 각 CSG 노드에 개별적으로 지정할 수 있습니다.">
+        <h2>CSG 연산</h2>
+        <p>Union / Intersection / Subtraction 세 가지 불리언 연산</p>
+        <table class="compare-table">
+          <tr>
+            <th>연산</th>
+            <th>상수</th>
+            <th>결과</th>
+            <th>활용 예</th>
+          </tr>
+          <tr>
+            <td>Union (합집합)</td>
+            <td><code>OPERATION_UNION</code></td>
+            <td>두 도형을 하나로 합침</td>
+            <td>벽 조합, 복잡한 형태 구축</td>
+          </tr>
+          <tr>
+            <td>Subtraction (차집합)</td>
+            <td><code>OPERATION_SUBTRACTION</code></td>
+            <td>자식 영역을 부모에서 제거</td>
+            <td>문, 창문, 구멍 뚫기</td>
+          </tr>
+          <tr>
+            <td>Intersection (교집합)</td>
+            <td><code>OPERATION_INTERSECTION</code></td>
+            <td>겹치는 영역만 남김</td>
+            <td>절단면 표현, 클리핑</td>
+          </tr>
+        </table>
+        <div class="two-columns">
+          <div>
+            <pre><code class="language-gdscript"># CSG로 아치형 통로 만들기
+func create_archway():
+    var combiner = CSGCombiner3D.new()
+    add_child(combiner)
+
+    # 벽 본체
+    var wall = CSGBox3D.new()
+    wall.size = Vector3(6, 4, 1)
+    wall.operation = CSGShape3D.OPERATION_UNION
+    combiner.add_child(wall)
+
+    # 직사각형 통로 (하단 빼기)
+    var passage = CSGBox3D.new()
+    passage.size = Vector3(2, 2.5, 2)
+    passage.position.y = -0.75
+    passage.operation = (
+        CSGShape3D.OPERATION_SUBTRACTION
+    )
+    combiner.add_child(passage)
+
+    # 반원 아치 (상단 빼기)
+    var arch = CSGCylinder3D.new()
+    arch.radius = 1.0
+    arch.height = 2.0
+    arch.sides = 16
+    arch.position.y = 0.5
+    arch.rotation_degrees.x = 90
+    arch.operation = (
+        CSGShape3D.OPERATION_SUBTRACTION
+    )
+    combiner.add_child(arch)</code></pre>
+          </div>
+          <div>
+            <pre><code class="language-gdscript"># CSG에 머티리얼 적용
+func apply_csg_materials():
+    var wall = $CSGCombiner3D/Wall
+
+    # 각 CSG 노드에 개별 머티리얼
+    var brick_mat = StandardMaterial3D.new()
+    brick_mat.albedo_texture = preload(
+        "res://textures/brick.png"
+    )
+    brick_mat.uv1_scale = Vector3(2, 2, 1)
+    wall.material = brick_mat
+
+# use_collision으로 충돌 자동 생성
+func setup_csg_collision():
+    var combiner = $CSGCombiner3D
+    combiner.use_collision = true
+    combiner.collision_layer = 1
+    combiner.collision_mask = 1
+    # CSG가 자동으로 트라이메시 충돌 생성</code></pre>
+            <div class="tip">
+              <strong>Tip:</strong> CSG 노드에서 <code>use_collision = true</code>를 설정하면 자동으로 트라이메시 충돌 셰이프가 생성됩니다. 프로토타이핑에서 별도의 충돌 셰이프 없이 바로 테스트할 수 있어 매우 편리합니다.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 16: MultiMeshInstance3D -->
+      <section data-narration="MultiMeshInstance3D는 동일한 메시를 수천, 수만 개 효율적으로 렌더링하는 노드입니다. 나무 숲, 잔디밭, 바위 군집, 군중 등 같은 오브젝트를 대량으로 배치할 때 사용합니다. 일반 MeshInstance3D를 수천 개 배치하면 드로우 콜이 폭증하지만, MultiMesh는 한 번의 드로우 콜로 모든 인스턴스를 렌더링하여 성능이 비약적으로 향상됩니다.">
+        <h2>MultiMeshInstance3D</h2>
+        <p><span class="badge badge-green">대량 렌더링</span> 동일 메시를 수천 개 효율적으로 그리기</p>
+        <div class="two-columns">
+          <div>
+            <pre><code class="language-gdscript"># 잔디밭 생성 (10,000개)
+func create_grass_field():
+    var multi = MultiMeshInstance3D.new()
+    var mm = MultiMesh.new()
+
+    # 메시 설정
+    mm.mesh = preload(
+        "res://assets/models/grass_blade.tres"
+    )
+    mm.transform_format = (
+        MultiMesh.TRANSFORM_3D
+    )
+    mm.instance_count = 10000
+    # 인스턴스별 색상 사용
+    mm.use_colors = true
+
+    # 각 인스턴스 배치
+    for i in mm.instance_count:
+        var xform = Transform3D()
+        # 랜덤 위치
+        var pos = Vector3(
+            randf_range(-50, 50),
+            0,
+            randf_range(-50, 50)
+        )
+        xform.origin = pos
+        # 랜덤 회전
+        xform = xform.rotated(
+            Vector3.UP, randf() * TAU
+        )
+        # 랜덤 스케일
+        var s = randf_range(0.8, 1.5)
+        xform = xform.scaled(Vector3(s, s, s))
+        mm.set_instance_transform(i, xform)
+
+        # 랜덤 색상 변화
+        var green = randf_range(0.3, 0.8)
+        mm.set_instance_color(i,
+            Color(0.2, green, 0.1))
+
+    multi.multimesh = mm
+    add_child(multi)</code></pre>
+          </div>
+          <div>
+            <div class="key-point">
+              <h3>성능 비교</h3>
+              <table class="compare-table">
+                <tr>
+                  <th>방식</th>
+                  <th>10,000개 렌더링</th>
+                </tr>
+                <tr>
+                  <td>MeshInstance3D x 10,000</td>
+                  <td style="color: var(--gd-red);">드로우콜 10,000+ / 느림</td>
+                </tr>
+                <tr>
+                  <td>MultiMeshInstance3D</td>
+                  <td style="color: var(--gd-green);">드로우콜 1 / 빠름</td>
+                </tr>
+              </table>
+            </div>
+            <pre><code class="language-gdscript"># 런타임에 인스턴스 업데이트
+func _process(delta: float):
+    var mm = $MultiMeshInstance3D.multimesh
+    # 바람에 흔들리는 효과
+    for i in mm.instance_count:
+        var xform = mm.get_instance_transform(i)
+        # Y축 회전 미세 조정 (바람)
+        var wind = sin(
+            Time.get_ticks_msec() * 0.001
+            + xform.origin.x * 0.5
+        ) * 0.05
+        xform.basis = xform.basis.rotated(
+            Vector3.RIGHT, wind * delta
+        )
+        mm.set_instance_transform(i, xform)</code></pre>
+            <div class="tip">
+              <strong>Tip:</strong> 에디터에서 MultiMeshInstance3D 노드를 선택하면 Populate Surface 도구로 다른 메시 표면 위에 인스턴스를 자동 배치할 수 있습니다.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 17: SurfaceTool -->
+      <section data-narration="SurfaceTool은 코드로 메시를 정점 단위로 직접 구성하는 도구입니다. 절차적 지형 생성, 커스텀 프리미티브, 런타임 메시 변형 등에 사용됩니다. begin 메서드로 프리미티브 타입을 지정한 후 법선, UV, 색상, 정점을 순서대로 추가합니다. generate_normals 메서드로 법선을 자동 계산할 수도 있어 매우 편리합니다.">
+        <h2>SurfaceTool</h2>
+        <p><span class="badge badge-orange">절차적 생성</span> 코드로 정점 단위 메시 구성</p>
+        <div class="two-columns">
+          <div>
+            <pre><code class="language-gdscript"># SurfaceTool로 삼각형 생성
+func create_triangle() -&gt; ArrayMesh:
+    var st = SurfaceTool.new()
+    st.begin(Mesh.PRIMITIVE_TRIANGLES)
+
+    # 법선 설정 (앞면)
+    st.set_normal(Vector3(0, 0, 1))
+
+    # UV 좌표 + 정점 (순서 중요!)
+    st.set_uv(Vector2(0, 1))
+    st.add_vertex(Vector3(-1, -1, 0))
+
+    st.set_uv(Vector2(0.5, 0))
+    st.add_vertex(Vector3(0, 1, 0))
+
+    st.set_uv(Vector2(1, 1))
+    st.add_vertex(Vector3(1, -1, 0))
+
+    return st.commit()</code></pre>
+          </div>
+          <div>
+            <pre><code class="language-gdscript"># 절차적 평면 (격자) 생성
+func create_grid(
+    width: int, depth: int, cell_size: float
+) -&gt; ArrayMesh:
+    var st = SurfaceTool.new()
+    st.begin(Mesh.PRIMITIVE_TRIANGLES)
+
+    for x in width:
+        for z in depth:
+            var pos = Vector3(
+                x * cell_size, 0, z * cell_size
+            )
+            # 쿼드 (삼각형 2개)
+            # 삼각형 1
+            st.set_uv(Vector2(0, 0))
+            st.add_vertex(pos)
+            st.set_uv(Vector2(1, 0))
+            st.add_vertex(pos + Vector3(cell_size, 0, 0))
+            st.set_uv(Vector2(0, 1))
+            st.add_vertex(pos + Vector3(0, 0, cell_size))
+            # 삼각형 2
+            st.set_uv(Vector2(1, 0))
+            st.add_vertex(pos + Vector3(cell_size, 0, 0))
+            st.set_uv(Vector2(1, 1))
+            st.add_vertex(pos + Vector3(cell_size, 0, cell_size))
+            st.set_uv(Vector2(0, 1))
+            st.add_vertex(pos + Vector3(0, 0, cell_size))
+
+    # 법선 자동 계산
+    st.generate_normals()
+    # 접선 자동 계산 (Normal Map용)
+    st.generate_tangents()
+
+    return st.commit()</code></pre>
+          </div>
+        </div>
+        <div class="tip">
+          <strong>Tip:</strong> <code>generate_normals()</code>를 호출하면 정점 법선을 자동 계산합니다. Normal Map을 사용하려면 <code>generate_tangents()</code>도 함께 호출하세요.
+        </div>
+      </section>
+
+      <!-- Slide 18: UV 매핑 기초 + 정리 -->
+      <section data-narration="UV 매핑은 3D 표면에 2D 텍스처를 입히는 과정입니다. U와 V는 각각 가로축과 세로축을 나타내며 0부터 1 사이의 좌표로 텍스처 위치를 지정합니다. 이번 챕터에서는 메시 구조부터 PBR 머티리얼, 셰이더, CSG, MultiMesh, SurfaceTool까지 3D 오브젝트의 형태와 질감을 다루는 핵심 기술을 학습했습니다. 다음 챕터에서는 3D 애니메이션을 배웁니다.">
+        <h2>UV 매핑 기초 / 챕터 정리</h2>
+        <div class="two-columns">
+          <div>
+            <h3>UV 매핑이란?</h3>
+            <div class="key-point">
+              <ul>
+                <li><strong>U축</strong> = 가로 (0.0 ~ 1.0)</li>
+                <li><strong>V축</strong> = 세로 (0.0 ~ 1.0)</li>
+                <li>3D 표면의 각 정점에 2D 텍스처 좌표를 매핑</li>
+                <li>UV가 1을 초과하면 텍스처가 반복(타일링)</li>
+              </ul>
+            </div>
+            <pre><code class="language-gdscript"># UV 스케일로 텍스처 타일링
+var mat = StandardMaterial3D.new()
+mat.albedo_texture = preload(
+    "res://textures/tile.png"
+)
+# 4x4 반복
+mat.uv1_scale = Vector3(4.0, 4.0, 1.0)
+
+# UV 오프셋으로 스크롤 (애니메이션)
+func _process(delta):
+    var mat = $Mesh.get_surface_override_material(0)
+    mat.uv1_offset.x += delta * 0.5</code></pre>
+          </div>
+          <div>
+            <h3>Chapter 17 핵심 정리</h3>
+            <table class="compare-table">
+              <tr>
+                <th>주제</th>
+                <th>핵심 키워드</th>
+              </tr>
+              <tr>
+                <td>메시</td>
+                <td>ArrayMesh, PrimitiveMesh, 정점/법선/UV</td>
+              </tr>
+              <tr>
+                <td>MeshInstance3D</td>
+                <td>mesh, material_override, LOD, 그림자</td>
+              </tr>
+              <tr>
+                <td>StandardMaterial3D</td>
+                <td>Albedo, Metallic, Roughness, PBR</td>
+              </tr>
+              <tr>
+                <td>Normal/Emission</td>
+                <td>법선맵, 자체발광, 블룸</td>
+              </tr>
+              <tr>
+                <td>Transparency</td>
+                <td>Alpha, Scissor, Hash, 정렬</td>
+              </tr>
+              <tr>
+                <td>ShaderMaterial</td>
+                <td>vertex, fragment, uniform, .gdshader</td>
+              </tr>
+              <tr>
+                <td>CSG</td>
+                <td>Union, Subtraction, Intersection</td>
+              </tr>
+              <tr>
+                <td>MultiMesh</td>
+                <td>대량 렌더링, 인스턴스, 1 드로우콜</td>
+              </tr>
+              <tr>
+                <td>SurfaceTool</td>
+                <td>절차적 메시, generate_normals</td>
+              </tr>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 19 (end): Next Chapter -->
+      <section class="chapter-title" data-transition="zoom" data-narration="챕터 17을 마치겠습니다. 3D 메시의 구조부터 PBR 머티리얼, 커스텀 셰이더, CSG 모델링, MultiMesh 대량 렌더링까지 3D 시각 표현의 핵심을 모두 학습했습니다. 다음 챕터에서는 3D 모델 임포트, 스켈레탈 애니메이션, AnimationTree 블렌딩, IK, 절차적 애니메이션 등 3D 애니메이션의 세계로 들어갑니다. 캐릭터에 생명을 불어넣어 봅시다!">
+        <span class="chapter-number">Next</span>
+        <h1>수고하셨습니다!</h1>
+        <br>
+        <p><a href="18-3d-animation.html" style="color: var(--gd-blue); font-size: 1.2em;">다음 챕터: 3D 애니메이션 &#8594;</a></p>
+        <br>
+        <p><a href="../index.html" style="color: #888; font-size: 0.7em;">&#8592; 목차로 돌아가기</a></p>
+      </section>
+
+    </div>
+  </div>
+  <div class="nav-footer"><a href="../index.html" style="color: #888;">Godot 초보부터 고수까지</a> | Chapter 17</div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/plugin/highlight/highlight.min.js"></script>
+  <script>
+    Reveal.initialize({ hash: true, slideNumber: true, plugins: [RevealHighlight], transition: 'slide', height: 700, center: false, margin: 0.04, minScale: 0.2, maxScale: 1.5, keyboard: { 38: null, 40: null }, mouseWheel: false });
+    document.addEventListener('keydown', function(e) { if (e.keyCode === 38 || e.keyCode === 40) { var slide = Reveal.getCurrentSlide(); if (!slide) return; var amount = 80; if (e.keyCode === 38) { slide.scrollTop -= amount; } else { slide.scrollTop += amount; } e.preventDefault(); e.stopPropagation(); } }, true);
+  </script>
+  <script src="js/narration.js"></script>
+</body>
+</html>
